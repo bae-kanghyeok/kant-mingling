@@ -1,0 +1,10 @@
+.env*
+.git
+/docs/
+/tests/
+/scripts/
+/db/
+*.local.json
+*.log
+*.tsbuildinfo
+next-env.d.ts

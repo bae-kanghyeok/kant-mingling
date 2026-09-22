@@ -1,0 +1,8 @@
+{
+  "title": "KANT Mingling",
+  "students": ["학생01", "학생02", "학생03", "학생04", "학생05", "학생06"],
+  "operators": [{"name": "운영진A", "team": "A"}, {"name": "운영진B", "team": "B"}],
+  "host": "운영진A",
+  "moveCountPerTeam": 1,
+  "blockTargetMinutes": [12, 12, 15]
+}

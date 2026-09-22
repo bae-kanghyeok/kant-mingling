@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>KANT Mingling · 혼자 하는 리허설</title>
+  <style>
+    :root{color-scheme:light;--paper:#f6f4ed;--white:#fffefa;--ink:#182c37;--muted:#657278;--line:#dedfd5;--orange:#ee7245;--green:#e6ecdf}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.6 "Malgun Gothic",Arial,sans-serif}button,input,a{-webkit-tap-highlight-color:transparent}button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--orange);outline-offset:3px}button,a{touch-action:manipulation}h1,h2,h3,p{margin:0}button{color:inherit}a{color:inherit}small{font-size:11px}
+    .shell{display:grid;grid-template-columns:328px minmax(0,1fr);min-height:100dvh}.sidebar{padding:25px 22px 20px;border-right:1px solid var(--line);background:var(--white);max-height:100dvh;overflow-y:auto;overscroll-behavior:contain}.brand{font-size:24px;font-weight:850;letter-spacing:-1.1px;line-height:1.15}.brand span{font-weight:400}.brand i{font-style:normal;color:var(--orange)}.eyebrow{font:10px/1.5 monospace;letter-spacing:1.4px;color:var(--muted);margin:7px 0 22px}.sidebar h1{font-size:20px;letter-spacing:-.8px;line-height:1.45}.intro{font-size:12px;color:var(--muted);margin:8px 0 16px;word-break:keep-all}.ready{display:flex;align-items:center;gap:7px;color:#435844;font-size:11px;font-weight:700;padding:8px 10px;background:var(--green);border-radius:8px}.dot{width:6px;height:6px;display:inline-block;background:#718567;border-radius:50%;flex-shrink:0}.tools{display:flex;gap:7px;margin:15px 0}.button{border:1px solid var(--line);border-radius:9px;background:var(--white);min-height:40px;padding:8px 11px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}.button:hover:not(:disabled){border-color:#aab6ae;background:#f1f3ea}.button.primary{background:var(--ink);color:var(--white);border-color:var(--ink);flex:1}.button.primary:hover:not(:disabled){background:#2c4654}.button.subtle{background:transparent}.button.danger{color:#a84627}.group-title{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);margin:20px 0 10px}.group-title strong{color:var(--ink);font-size:12px}.teams{display:grid;gap:10px}.team{border:1px solid var(--line);border-radius:12px;padding:12px}.team.selected-team{border-color:#becbbb;background:#f8faf4}.team-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.team-title{display:flex;align-items:center;gap:7px;font-size:13px}.team-letter{display:inline-grid;place-items:center;width:25px;height:25px;background:var(--ink);color:var(--white);font-size:11px;border-radius:7px}.team-status{font-size:10px;color:var(--muted);text-align:right}.members{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.person{border:1px solid transparent;background:#f0f1e9;border-radius:7px;padding:6px 3px;min-height:37px;font-size:11px;display:flex;align-items:center;justify-content:center;gap:3px;white-space:nowrap}.person:hover:not(:disabled){background:#e5e9dd}.person[aria-pressed=true]{background:var(--ink);color:var(--white)}.person.operator{grid-column:1/-1;background:#faf0e9}.person.operator[aria-pressed=true]{background:var(--ink)}.badge{font-size:9px;opacity:.75;font-weight:400}.team-actions{display:flex;gap:6px;margin-top:9px}.team-actions .button{flex:1;min-height:32px;padding:5px;font-size:10px}.settings{border-top:1px solid var(--line);margin-top:19px;padding-top:13px}.check{display:flex;align-items:flex-start;gap:9px;font-size:12px;font-weight:700;cursor:pointer;padding:4px 0}.check input{accent-color:var(--ink);width:17px;height:17px;margin:2px 0 0;flex-shrink:0}.check span small{display:block;color:var(--muted);font-weight:400;font-size:10px;margin-top:2px;line-height:1.6}.notes{font-size:11px;color:var(--muted);line-height:1.8;margin:14px 0 0}.notes summary{cursor:pointer;color:var(--ink);font-weight:700}.notes p{margin-top:7px}.session{border-top:1px solid var(--line);padding-top:13px;margin-top:16px;color:var(--muted);font:10px/1.7 monospace;overflow-wrap:anywhere}
+    .stage{padding:21px 28px 18px;min-width:0;display:flex;flex-direction:column;height:100dvh;gap:13px}.stage-head{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-shrink:0}.stage-heading{min-width:0}.stage-kicker{color:var(--muted);font-size:10px;letter-spacing:.08em;margin-bottom:2px}.stage-title{font-size:20px;letter-spacing:-.6px;font-weight:750;line-height:1.4}.stage-caption{color:var(--muted);font-size:11px;margin-top:4px}.stage-actions{display:flex;align-items:center;gap:8px}.event-chip{font-size:10px;font-weight:700;border:1px solid #d5ddd0;background:#e9eee3;padding:6px 10px;border-radius:30px;white-space:nowrap}.error{background:#fff0e8;border:1px solid #e6beaa;color:#93472c;padding:10px 14px;border-radius:10px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0}.error[hidden]{display:none}.error button{border:0;text-decoration:underline;background:transparent;color:inherit;padding:7px;white-space:nowrap}.frame-wrap{flex:1;min-height:0;border:1px solid #d4d9ce;border-radius:16px;overflow:hidden;background:var(--white);box-shadow:0 10px 35px #20343d07;position:relative}.frame-wrap iframe{border:0;width:100%;height:100%;display:block;background:var(--paper)}.placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center;background:var(--white);flex-direction:column;gap:12px}.placeholder[hidden]{display:none}.placeholder-mark{font-size:58px;line-height:1;color:var(--orange);font-family:Georgia,serif}.placeholder h2{font-size:20px}.placeholder p{font-size:12px;color:var(--muted);max-width:290px;word-break:keep-all}.stage-foot{display:flex;justify-content:space-between;gap:12px;font-size:10px;color:var(--muted);flex-shrink:0}.stage-foot b{font-weight:500;color:#435b48}.loading{opacity:.55;pointer-events:none}
+    .modal{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:#182c3780}.modal-card{width:min(100%,420px);background:var(--white);border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 18px 70px #182c3733}.modal-card h2{font-size:21px;letter-spacing:-.6px;line-height:1.4}.modal-card p{font-size:13px;color:var(--muted);margin-top:13px;word-break:keep-all;line-height:1.8}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:24px}.modal-actions .button{min-width:95px;min-height:44px}.modal-actions .primary{flex:0 1 auto}
+    @media(min-width:1450px){.stage{padding:25px 4vw}.shell{grid-template-columns:348px minmax(0,1fr)}.sidebar{padding:28px}}
+    @media(max-width:900px){.shell{grid-template-columns:280px minmax(0,1fr)}.sidebar{padding:20px 15px}.stage{padding:18px 16px}.stage-title{font-size:18px}.stage-head{align-items:flex-start}.stage-actions{flex-direction:column;align-items:flex-end;gap:5px}.stage-actions .button{font-size:10px;min-height:32px;padding:5px 8px}}
+    @media(max-width:680px){.shell{display:flex;flex-direction:column}.sidebar{max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px}.brand{font-size:21px}.eyebrow{margin-bottom:15px}.sidebar h1{font-size:18px}.intro{margin-bottom:12px}.group-title{margin-top:16px}.teams{display:flex;overflow-x:auto;padding-bottom:5px;scroll-snap-type:x proximity}.team{flex:0 0 235px;scroll-snap-align:start}.settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notes{margin-top:12px}.session{display:none}.stage{height:90dvh;min-height:610px;padding:16px 12px}.stage-head{gap:8px}.stage-title{font-size:17px}.stage-caption{font-size:10px}.stage-foot{font-size:9px}.stage-foot span:last-child{display:none}.frame-wrap{border-radius:12px}}
+    @media(prefers-reduced-motion:no-preference){button,a{transition:background .12s ease,border-color .12s ease}}
+  </style>
+  <script src="/lab.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="리허설 컨트롤">
+      <div class="brand">KANT <span>Mingling</span><i> ·</i></div>
+      <p class="eyebrow">Solo rehearsal / Whose Data?</p>
+      <h1>모두 모였다고 생각하고,<br>직접 플레이해 보세요.</h1>
+      <p class="intro">가상 참가자의 화면을 오가며 게임과 관제를 한 번에 확인할 수 있어요.</p>
+      <div class="ready"><i class="dot" aria-hidden="true"></i>가상 참가자 21명 · 개발 리허설</div>
+      <div class="tools">
+        <button id="host-button" class="button primary" type="button" disabled>호스트 관제</button>
+        <button id="restart-button" class="button subtle" type="button" disabled>새 리허설</button>
+      </div>
+      <div class="group-title"><strong>참가자 화면</strong><span id="profile-count">21명 프로필 완료</span></div>
+      <div id="teams" class="teams" aria-label="조별 참가자"></div>
+      <div class="settings">
+        <label class="check"><input id="follow-toggle" type="checkbox" disabled><span>진행권 자동 따라가기<small id="follow-caption">선택한 조의 진행권자 화면으로 이동</small></span></label>
+        <label class="check"><input id="bots-toggle" type="checkbox" checked disabled><span>가상 참가자 자동 응답<small>보고 있는 사람 외에 안내 확인·투표</small></span></label>
+      </div>
+      <details class="notes" open>
+        <summary>이렇게 플레이하세요</summary>
+        <p>① 조의 <b>진행권자 화면</b>으로 이동해서 단서를 받아 보세요.<br>② 다른 이름을 누르면 그 사람에게 온 단서만 보여요.<br>③ 정답 공개 후에는 운영진 화면에서 다음 판을 시작해요.</p>
+        <p>가상 참가자는 안내 확인과 투표만 자동으로 해요. 단서 요청·공유·추리·다음 판은 직접 진행해 주세요. 현재 보고 있는 사람은 자동 응답에서 빠져요.</p>
+      </details>
+      <div class="session"><span id="session-slug">리허설 연결 중</span><br>Local only · 합성 프로필 사용</div>
+    </aside>
+    <main class="stage">
+      <header class="stage-head">
+        <div class="stage-heading">
+          <div class="stage-kicker">지금 보고 있는 참가자</div>
+          <h2 id="actor-title" class="stage-title">게임 화면 준비 중</h2>
+          <p id="actor-caption" class="stage-caption">21명의 참가 등록과 프로필 작성을 완료한 상태로 시작해요.</p>
+        </div>
+        <div class="stage-actions">
+          <span id="event-chip" class="event-chip">연결 중</span>
+          <a id="open-link" class="button subtle" target="_blank" rel="noopener noreferrer" hidden>새 탭에서 열기 ↗</a>
+        </div>
+      </header>
+      <div id="error-banner" class="error" role="status" hidden><span id="error-message"></span><button id="retry-button" type="button">다시 연결</button></div>
+      <div class="frame-wrap">
+        <iframe id="game-frame" title="선택한 가상 참가자의 실제 게임 화면" referrerpolicy="same-origin"></iframe>
+        <div id="placeholder" class="placeholder"><span class="placeholder-mark" aria-hidden="true">∴</span><h2 id="placeholder-title">리허설을 불러오고 있어요</h2><p id="placeholder-copy">잠시 후 호스트 화면이 열립니다. 화면을 선택하면 해당 참가자로 직접 플레이할 수 있어요.</p></div>
+      </div>
+      <footer class="stage-foot"><span><b>실제 게임 UI</b> · 선택한 참가자의 권한으로만 표시</span><span id="connection-status">참가자 상태 연결 중…</span></footer>
+    </main>
+  </div>
+  <div id="restart-dialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="restart-dialog-title" aria-describedby="restart-dialog-copy" hidden>
+    <div class="modal-card">
+      <h2 id="restart-dialog-title">새 리허설을 만들까요?</h2>
+      <p id="restart-dialog-copy">21명이 모두 참가한 새 게임을 만들고 호스트 화면으로 이동해요. 현재 리허설 기록은 그대로 보존돼요.</p>
+      <div class="modal-actions">
+        <button id="restart-cancel" class="button" type="button">취소</button>
+        <button id="restart-confirm" class="button primary" type="button">새 리허설 만들기</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

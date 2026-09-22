@@ -1,0 +1,9 @@
+# Copy to .env.local locally, then fill values in your editor.
+# Never commit the populated file or paste its values into chat/logs.
+DATABASE_URL=
+DATABASE_URL_UNPOOLED=
+AUTH_SECRET=
+# Endpoint ID only (ep-...), without -pooler or domain; verify in Neon console.
+DEVELOPMENT_NEON_ENDPOINT=
+# Separate production endpoint; required for production tooling.
+PRODUCTION_NEON_ENDPOINT=

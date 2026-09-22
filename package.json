@@ -1,0 +1,44 @@
+{
+  "name": "whos-data",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "rehearsal": "npm run build && node scripts/rehearsal.mjs",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:check": "node scripts/check-db.mjs",
+    "migrate": "node scripts/migrate.mjs",
+    "seed:dev": "node scripts/seed-dev-event.mjs",
+    "check:content": "node scripts/check-content.mjs",
+    "test": "vitest run tests/unit",
+    "test:db": "node scripts/run-db-tests.mjs"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/functions": "^3.9.9",
+    "next": "16.3.5",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  }
+}

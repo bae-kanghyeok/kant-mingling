@@ -1,0 +1,4 @@
+* text=auto
+db/migrations/*.sql text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
