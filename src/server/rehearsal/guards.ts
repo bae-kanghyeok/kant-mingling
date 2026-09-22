@@ -1,5 +1,5 @@
 import "server-only";
-import { developmentConnectionString } from "../../../scripts/helpers/database-target.mjs";
+import { developmentConnectionString } from "../db/database-target.mjs";
 import { reject } from "../http/respond";
 
 /** An opt-in Preview/local feature; a production deployment always fails closed. */

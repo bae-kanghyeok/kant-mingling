@@ -1,4 +1,5 @@
-// Shared by the CLI and server routes. No filesystem, module-relative path,
+// Shared by the CLI and server routes. Kept in src so Vercel ships the module.
+// No filesystem, module-relative path,
 // environment-file loading, or connection creation belongs in this module.
 export function pinnedEndpoints() {
   const development = process.env.DEVELOPMENT_NEON_ENDPOINT;

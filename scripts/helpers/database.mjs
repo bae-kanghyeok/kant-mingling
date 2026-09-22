@@ -3,8 +3,8 @@ import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { Client } from "pg";
-import { developmentConnectionString, pinnedEndpoints } from "./database-target.mjs";
-export { developmentConnectionString } from "./database-target.mjs";
+import { developmentConnectionString, pinnedEndpoints } from "../../src/server/db/database-target.mjs";
+export { developmentConnectionString } from "../../src/server/db/database-target.mjs";
 
 export const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 
