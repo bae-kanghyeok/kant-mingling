@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { AdminPanel } from "./admin/AdminPanel";
-import { Entry } from "./player/Entry";
+import { Entry, Tutorial } from "./player/Entry";
 import { BlockDoneNotice, GameBoard, Reveal, WaitingRoom } from "./player/GameBoard";
 import { Profile } from "./player/Profile";
-import { StatusPanel } from "./ui/Modal";
+import { Modal, StatusPanel } from "./ui/Modal";
 import { Brand } from "./ui/Brand";
 import { useMingleState } from "./useMingleState";
 
@@ -13,6 +13,7 @@ export default function MingleApp({ slug }: { slug: string }) {
   const { state, error, terminal, disconnected, busy, send, refresh, clearError } = useMingleState(slug);
   const [adminOpen, setAdminOpen] = useState(false);
   const [editProfile, setEditProfile] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const ended = state?.event.phase === "ENDED" || terminal === 410;
   const control = (command: string) => state && void send("/api/admin", { command, teamKey: state.team?.key, expectedVersion: state.versions.team, args: {} }).catch(() => {});
   let content;
@@ -35,7 +36,8 @@ export default function MingleApp({ slug }: { slug: string }) {
     {disconnected && !ended && !terminal && <div className="connection-warning" role="status"><span>연결을 다시 확인하고 있어요. 화면은 곧 최신 상태로 맞춰져요.</span><button onClick={() => void refresh().catch(() => {})}>다시 연결</button></div>}
     {error && <div className="error-message app-error" role="alert"><span>{error}</span><button className="icon-button" aria-label="오류 안내 닫기" onClick={clearError}>×</button></div>}
     <div className="page-content">{content}</div>
-    <footer className="app-footer">서로의 Data가, 새로운 대화가 되도록.</footer>
+    <footer className="app-footer">{state?.me && <button className="text-button small" onClick={() => setTutorialOpen(true)}>게임 방법 다시 보기</button>}<p>서로의 Data가, 새로운 대화가 되도록.</p></footer>
+    {tutorialOpen && <Modal title="게임 방법 다시 보기" onClose={() => setTutorialOpen(false)}><Tutorial doneLabel="게임으로 돌아가기" onDone={() => setTutorialOpen(false)} /></Modal>}
     {adminOpen && state?.admin && !ended && <AdminPanel state={state} send={send} busy={busy} onClose={() => setAdminOpen(false)} />}
   </main>;
 }

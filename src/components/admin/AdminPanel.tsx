@@ -38,6 +38,7 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
   const [message, setMessage] = useState<string | null>(null);
   const admin = state.admin;
   if (!admin) return null;
+  const commandLabel = (command: string) => command === "start-block-game" && state.event.teamCount === 1 ? "준비 완료 · Game 시작" : labels[command] ?? command;
   const team = admin.teams.find((item) => item.key === teamKey);
   const can = (command: string) => state.allowedActions.includes(command);
   const execute = async (command: string, args: Record<string, unknown> = {}) => {
@@ -47,7 +48,7 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
       if (command === "ensemble-shared" || command === "ensemble-end-discussion") {
         await send(`/api/game/${command}`, { gameId: team?.gameId, gameVersion: team?.gameVersion });
       } else await send("/api/admin", { command, teamKey, expectedVersion, args });
-      setMessage(commandFeedback ?? `${labels[command] ?? "변경"} 완료`);
+      setMessage(commandFeedback ?? `${commandLabel(command)} 완료`);
       return true;
     } catch (failure) { setMessage(failure instanceof Error ? failure.message : "잠시 후 다시 시도해주세요."); return false; }
   };
@@ -69,7 +70,7 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
     if (command === "ensemble-end-discussion") return team.stage === "ENSEMBLE_DISCUSS" && !team.paused;
     return true;
   };
-  const button = (command: string, args = {}) => can(command) && validForTeam(command) && <button key={command} className={`button ${command.includes("end") ? "danger-outline" : "secondary"}`} disabled={busy} onClick={() => void run(command, args)}>{labels[command] ?? command}</button>;
+  const button = (command: string, args = {}) => can(command) && validForTeam(command) && <button key={command} className={`button ${command.includes("end") ? "danger-outline" : "secondary"}`} disabled={busy} onClick={() => void run(command, args)}>{commandLabel(command)}</button>;
   return <Modal title="관리자" onClose={onClose} wide className="admin-panel">
     <p className="small muted">관리자 화면에서도 정답 정보는 공개되지 않습니다.</p>
     <nav className="admin-tabs" aria-label="관리자 메뉴">{[["progress", "진행"], ["people", "참가자"], ["settings", "설정"], ["logs", "로그"]].map(([key, label]) => <button key={key} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>

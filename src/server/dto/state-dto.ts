@@ -74,6 +74,13 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
     else if (gtCard && !s.overlays.some((row) => row.game_id === game.id && row.participant_id === me.id && row.kind === "ground_truth")) out.pendingOverlay = { kind: "ground_truth", cardNo: gtCard.card_no };
     else if (cards.length >= guessThreshold && noiseCount > 0 && !intros.includes("noise")) out.pendingOverlay = { kind: "noise", cardCount: cards.length, noiseCount };
   }
+  // Only an eligible Turn Lead may review team-delivered wording while choosing Noise.
+  // Keep ordinary cards recipient-scoped and never include which option is true/Noise.
+  if (out.guess?.enabled && (out.guess.noiseCount ?? 0) > 0 && !out.pendingOverlay &&
+      s.event.phase === "BLOCK" && block?.phase === "IN_GAME") {
+    out.guess.cards = cards.filter((card) => s.deliveries.some((delivery) => delivery.card_id === card.id))
+      .map((card) => ({ cardNo: card.card_no, ...cardContent(card.question_id, card.displayed_option) }));
+  }
   if (isRevealed) {
     const owner = members.find((p) => p.id === game.owner_participant_id);
     if (!owner || !game.end_reason) reject(503, "DB_UNAVAILABLE");
@@ -147,7 +154,7 @@ export function buildPublicState(s: EventSnapshot): PublicState {
     const previous = s.games.filter((g) => g.phase === "REVEALED" && s.members.some((m) => m.game_id === g.id && m.participant_id === me.id))
       .sort((a, b) => (ms(b.revealed_at) ?? 0) - (ms(a.revealed_at) ?? 0))[0];
     return { serverNow: s.now, poll: { intervalMs: s.event.config_json.pollIdleMs, needsSync: false },
-      versions: { session: s.event.session_version }, event: { slug: s.event.slug, title: s.event.title, phase: "ENDED", currentBlock: s.event.current_block },
+      versions: { session: s.event.session_version }, event: { slug: s.event.slug, title: s.event.title, phase: "ENDED", currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount },
       me: { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros }, allowedActions: [],
       ...(previous ? { lastReveal: gameDto(s, previous, me, intros) } : {}) };
   }
@@ -158,7 +165,7 @@ export function buildPublicState(s: EventSnapshot): PublicState {
   const needsSync = s.games.some((g) => g.phase === "ENSEMBLE_VOTE" && g.vote_deadline && ms(g.vote_deadline)! <= ms(s.now)! && !s.blocks.find((b) => b.id === g.team_block_id)?.paused_at);
   const out: PublicState = { serverNow: s.now, poll: { intervalMs: block?.phase === "IN_GAME" ? s.event.config_json.pollInGameMs : s.event.config_json.pollIdleMs, needsSync },
     versions: { session: s.event.session_version, ...(block ? { team: block.team_version } : {}) },
-    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block },
+    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount },
     me: me ? { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros } : null, allowedActions: [] };
   if (!me) {
     out.roster = s.people.filter((p) => p.active).map((p) => ({ ...person(p), locked: locked(s, p.id) }));

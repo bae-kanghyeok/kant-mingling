@@ -8,9 +8,10 @@ main은 기존 화면을 보존한다. develop에서 새 르탄이 아이콘, �
 
 ## develop 적용
 
-- `public/brand/rtan.png`, `src/app/icon.png`: 사용자가 2026-09-22 제공한 최신 르탄이 PNG. 원본 이미지의 비율·색을 바꾸지 않고 표시 크기만 조절한다.
+- `public/brand/rtan.png`: 사용자가 2026-09-22 제공한 최신 르탄이 PNG. 환영 화면과 정답 공개 캐릭터에 사용한다.
+- `public/brand/kant-k.png`, `src/app/icon.png`: [최신 KANT 요소의 48px Favicon](https://www.figma.com/design/BsKN6yqtEOg5Lbxs1OCfRU/?node-id=1-17387) 원본 export. 검은 정사각형 안의 흰 K이며 헤더 로고와 탭 아이콘에 사용한다. 이미지 비율·색·내부 여백을 유지한다. `public/brand/kant-k-glyph.svg`도 같은 노드의 원본 벡터로 보관한다. Figma MCP의 design context와 export를 확인해 가져왔으며 글리프를 새로 그리지 않았다.
 - Figma Guide에서 확인한 중립색: `#FFFFFF`, 본문 `#141617`, 보조 텍스트 `#3A3E41`, 경계 `#C7D2D8`.
 - 앱의 붉은 강조색과 여백·카드·서랍 구조는 위 자료를 참고해 이 게임에 맞게 설계했다. 원본에 게임 화면 목업이 있는 것으로 간주하지 않는다.
 - `src/components/ui/Brand.tsx`가 헤더·환영 화면·상태 안내에 쓰는 브랜드 요소를 제공한다.
 
-아이콘을 다른 행사에 재사용할 권한이 없다면 자신의 로고로 두 PNG를 교체하고 Brand 컴포넌트의 문구를 수정한다. 회사 Figma 전체 사본은 이 저장소에서 배포하지 않는다.
+아이콘을 다른 행사에 재사용할 권한이 없다면 자신의 로고로 브랜드 자산을 교체하고 Brand 컴포넌트의 문구를 수정한다. 회사 Figma 전체 사본은 이 저장소에서 배포하지 않는다.

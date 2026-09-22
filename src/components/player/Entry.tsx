@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { PublicState } from "@/lib/contracts";
 import type { SendAction } from "../useMingleState";
 import { Modal, SectionTitle } from "../ui/Modal";
@@ -12,20 +12,15 @@ const slides = [
   { title: "마지막 Data를 받은 사람이 Turn Lead입니다", body: "Turn Lead가 팀원들과 상의해 다음 Data를 볼지, 추리할지 결정합니다.", detail: "Data를 서로 공유하고 충분히 이야기한 뒤 결정해보세요.", symbol: "↔" },
 ];
 
-export function Tutorial({ onDone }: { onDone: () => void }) {
+export function Tutorial({ onDone, doneLabel = "프로필 만들기" }: { onDone: () => void; doneLabel?: string }) {
   const [step, setStep] = useState(0);
-  useEffect(() => {
-    if (step >= 2) return;
-    const timer = setTimeout(() => setStep((current) => Math.min(current + 1, 2)), 3000);
-    return () => clearTimeout(timer);
-  }, [step]);
   return <section className="panel tutorial">
-    <div className="tutorial-progress" aria-label={`게임 방법 ${step + 1} / 3`}>{slides.map((_, index) => <span key={index} className={index <= step ? "active" : ""} />)}</div>
-    <button className="tutorial-slide" aria-label="다음 게임 방법 보기" onClick={() => step < 2 && setStep(step + 1)}>
+    <div className="tutorial-progress" aria-label={`게임 방법 ${step + 1} / ${slides.length}`}>{slides.map((_, index) => <span key={index} className={index <= step ? "active" : ""} />)}</div>
+    <div className="tutorial-slide" aria-live="polite">
       <span className="tutorial-symbol" aria-hidden="true">{slides[step].symbol}</span>
       <p className="eyebrow">How to mingle · 0{step + 1}</p><h1>{slides[step].title}</h1><p>{slides[step].body}</p><p className="muted">{slides[step].detail}</p>
-    </button>
-    <button className="button primary full" onClick={() => step < 2 ? setStep(step + 1) : onDone()}>{step < 2 ? "다음" : "프로필 만들기"}<span aria-hidden="true">→</span></button>
+    </div>
+    <div className="action-grid"><button className="button secondary" disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))}><span aria-hidden="true">←</span>이전</button><button className="button primary" onClick={() => step < slides.length - 1 ? setStep(step + 1) : onDone()}>{step < slides.length - 1 ? "다음" : doneLabel}<span aria-hidden="true">→</span></button></div>
   </section>;
 }
 
@@ -54,6 +49,7 @@ export function Entry({ state, send, busy, initialStep = "welcome", initialOpera
   </section>;
   return <>
     <SectionTitle label="Check in" title="내 이름을 선택해주세요" description="오늘 함께할 얼굴들, 이름부터 만나봐요." />
+    <button className="text-button small" onClick={() => setStep("tutorial")}>게임 방법 다시 보기</button>
     {error && <p className="error-message" role="alert">{error}</p>}
     <div className="name-grid">{state.roster?.map((person) => <button key={person.participantId} className="name-button" disabled={busy || (person.locked && person.role !== "operator")}
       onClick={() => person.role === "operator" ? setOperator(person) : void claim(person.participantId)}>

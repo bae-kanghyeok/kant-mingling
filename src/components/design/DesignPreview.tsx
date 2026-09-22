@@ -10,7 +10,7 @@ import { Profile } from "../player/Profile";
 import { Brand } from "../ui/Brand";
 import { StatusPanel } from "../ui/Modal";
 import type { ApiResult, requestJson, SendAction } from "../useMingleState";
-import { createPreviewState, isAdminPreview, previewGroups, previewPeople, previewScenarios, type PreviewView } from "./fixtures";
+import { createPreviewState, isAdminPreview, previewGroups, previewGuessCards, previewPeople, previewScenarios, type PreviewView } from "./fixtures";
 import styles from "./DesignPreview.module.css";
 
 export default function DesignPreview({ embedded = false }: { embedded?: boolean }) {
@@ -51,7 +51,10 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
       setView("profile"); setState(next); setRevision((value) => value + 1);
       setNotice("프로필 작성 예시로 이동했어요. 실제 등록이나 코드 인증은 실행하지 않았어요.");
     } else if (path === "/api/game/intro-ack") {
-      setState((current) => ({ ...current, game: current.game ? { ...current.game, pendingOverlay: undefined } : undefined }));
+      setState((current) => ({ ...current, game: current.game ? { ...current.game, pendingOverlay: undefined,
+        guess: current.game.guess?.enabled && (current.game.guess.noiseCount ?? 0) > 0 &&
+          current.game.phase === "TURN" && !current.team?.paused && current.game.turnLead?.participantId === current.me?.participantId
+          ? { ...current.game.guess, cards: previewGuessCards(current.game) } : current.game.guess } : undefined }));
     } else if (path === "/api/session/release") navigate("names");
     else if (path === "/api/profile/submit") navigate("waiting");
     else if (path === "/api/game/ensemble-shared") navigate("vote");

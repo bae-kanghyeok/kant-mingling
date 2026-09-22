@@ -10,7 +10,8 @@ export interface PublicGame {
   candidates: Pick<Person,"participantId"|"displayName">[];
   cards: { cardNo: number; recipients: Pick<Person,"participantId"|"displayName">[]; question?: CardQuestion; text?: string; verified?: true }[];
   exhausted: boolean;
-  guess?: { enabled: boolean; locked: boolean; noiseCount?: number };
+  guess?: { enabled: boolean; locked: boolean; noiseCount?: number;
+    cards?: { cardNo: number; question: CardQuestion; text: string }[] };
   ensemble?: { stage: "SHARE"|"VOTE"|"DISCUSS"; triggerCardNo: number; sharer: Pick<Person,"participantId"|"displayName">;
     voteDeadline?: string; voteRemainingMs?: number; myVote?: string|null; myRevision?: number;
     results?: { participantId: string; displayName: string; votes: number }[] };
@@ -35,7 +36,7 @@ export interface AdminView {
 export interface PublicState {
   serverNow: string; poll: { intervalMs: number; needsSync: boolean };
   versions: { session: number; team?: number; game?: number };
-  event: { slug: string; title: string; phase: "SETUP"|"BLOCK"|"BREAK"|"ENDED"; currentBlock: number };
+  event: { slug: string; title: string; phase: "SETUP"|"BLOCK"|"BREAK"|"ENDED"; currentBlock: number; teamCount?: number };
   me: (Person & { isHost: boolean; profileComplete: boolean; introsSeen: IntroKey[] })|null;
   roster?: (Person & { locked: boolean })[];
   profile?: { answers: Partial<Record<string,"A"|"B">>; revisions: Partial<Record<string,number>>; complete: boolean; editable: boolean };

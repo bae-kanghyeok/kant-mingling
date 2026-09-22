@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { getPool } from "@/server/db/pool";
 import { createSessionToken, hashSessionToken } from "@/server/auth/session";
 import { hashOperatorCode } from "@/server/auth/operator-code";
-import { DEFAULT_GLOBAL_CONFIG } from "@/server/game/settings";
+import { DEFAULT_GLOBAL_CONFIG, parseGlobalConfig } from "@/server/game/settings";
 import { CONTENT_VERSION } from "@/content/catalog";
 import { developmentConnectionString } from "../../scripts/helpers/database.mjs";
 
@@ -17,18 +17,20 @@ export async function assertDevelopmentDatabase() {
   if (marker.rows[0]?.name !== "development") throw new Error("Development database marker required.");
 }
 
-export async function createTestEvent(): Promise<TestEvent> {
+export async function createTestEvent({ studentCount = 18, teamCount = 3, moveCountPerTeam = 3 } = {}): Promise<TestEvent> {
   await assertDevelopmentDatabase();
-  const event = { id: randomUUID(), slug: `test-${randomUUID()}`, students: Array.from({ length: 18 }, () => randomUUID()),
-    operators: Array.from({ length: 3 }, () => randomUUID()), operatorCodes: Array.from({ length: 3 }, () => randomBytes(18).toString("base64url")) };
+  const config = parseGlobalConfig({ ...DEFAULT_GLOBAL_CONFIG, studentCount, teamCount, moveCountPerTeam,
+    operatorTeamByName: Object.fromEntries(Array.from({ length: teamCount }, (_, index) => { const key = String.fromCharCode(65 + index); return [`운영진${key}`, key]; })) });
+  const event = { id: randomUUID(), slug: `test-${randomUUID()}`, students: Array.from({ length: studentCount }, () => randomUUID()),
+    operators: Array.from({ length: teamCount }, () => randomUUID()), operatorCodes: Array.from({ length: teamCount }, () => randomBytes(18).toString("base64url")) };
   const codes = await Promise.all(event.operatorCodes.map(hashOperatorCode));
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     await client.query("INSERT INTO events(id,slug,config_json,content_version) VALUES($1,$2,$3,$4)",
-      [event.id, event.slug, JSON.stringify({ ...DEFAULT_GLOBAL_CONFIG, operatorTeamByName: { "운영진A": "A", "운영진B": "B", "운영진C": "C" } }), CONTENT_VERSION]);
+      [event.id, event.slug, JSON.stringify(config), CONTENT_VERSION]);
     const roster = [...event.students.map((id, index) => ({ id, name: `학생${String(index + 1).padStart(2, "0")}`, role: "student", order: index + 1, hash: null })),
-      ...event.operators.map((id, index) => ({ id, name: `운영진${String.fromCharCode(65 + index)}`, role: "operator", order: index + 19, hash: codes[index] }))];
+      ...event.operators.map((id, index) => ({ id, name: `운영진${String.fromCharCode(65 + index)}`, role: "operator", order: index + studentCount + 1, hash: codes[index] }))];
     await client.query(`INSERT INTO participants(id,event_id,display_name,role,roster_order,operator_code_hash)
       SELECT x.id,$1,x.name,x.role,x.ord,x.hash FROM jsonb_to_recordset($2::jsonb)
       AS x(id uuid,name text,role text,ord smallint,hash text)`,

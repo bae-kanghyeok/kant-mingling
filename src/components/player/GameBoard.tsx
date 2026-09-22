@@ -87,24 +87,26 @@ export function GameBoard({ state, game, send, busy, initialGuessOpen = false, i
 
 export function WaitingRoom({ state }: { state: PublicState }) {
   if (state.team?.notInCurrentGame) return <StatusPanel title="다음 Game부터 함께해요."><p className="muted">지금 진행 중인 대화를 함께 들어주세요.</p></StatusPanel>;
-  return <><SectionTitle label="Your team" title={state.nextBlock ? "새로운 사람들과 만나볼 시간입니다. 새 조를 확인해주세요." : "오늘의 Mingle 조"} description="함께 추리할 사람들을 확인해보세요." />
+  const singleTeam = state.event.teamCount === 1;
+  return <><SectionTitle label="Your team" title={state.nextBlock ? singleTeam ? "같은 조에서 다음 블록을 시작해요." : "새로운 사람들과 만나볼 시간입니다. 새 조를 확인해주세요." : "오늘의 Mingle 조"} description="함께 추리할 사람들을 확인해보세요." />
     <div className="team-ticket"><div className="team-letter">{state.nextBlock?.teamKey ?? state.team?.key ?? "?"}<span>Team</span></div><div><h2>{state.nextBlock ? `${state.nextBlock.seatNo}번 자리` : "함께할 사람들"}</h2><p>{state.nextBlock?.members.join(" · ") ?? state.team?.members.map((person) => person.displayName).join(" · ") ?? "조를 준비하고 있어요."}</p></div></div>
-    <p className="notice">{state.team?.phase === "SEATING" ? "새 자리에 앉으면 운영진이 Game을 시작해요." : "잠시 후 Game이 시작됩니다."}</p>
+    <p className="notice">{state.team?.phase === "SEATING" ? singleTeam ? "자리 이동 없이 함께 준비해주세요. 호스트가 Game을 시작해요." : "새 자리에 앉으면 운영진이 Game을 시작해요." : "잠시 후 Game이 시작됩니다."}</p>
   </>;
 }
 
 export function BlockDoneNotice({ state }: { state: PublicState }) {
+  const singleTeam = state.event.teamCount === 1;
   const waitingForOthers = state.team?.waitingForOthers;
   const finalBlockComplete = state.event.currentBlock === 3 && state.event.phase === "BLOCK" && !waitingForOthers;
   const title = waitingForOthers
     ? "다른 조의 Game이 끝나기를 기다리고 있어요."
     : finalBlockComplete
-      ? "모든 조의 Game이 끝났어요. 마지막 대화를 나눠보세요."
-      : "새로운 사람들과 만나볼 시간입니다. 다음 조 안내를 기다려주세요.";
+      ? singleTeam ? "모든 Game이 끝났어요. 마지막 대화를 나눠보세요." : "모든 조의 Game이 끝났어요. 마지막 대화를 나눠보세요."
+      : singleTeam ? "이번 블록을 마쳤어요. 같은 조에서 다음 블록을 기다려주세요." : "새로운 사람들과 만나볼 시간입니다. 다음 조 안내를 기다려주세요.";
   const description = waitingForOthers
     ? "함께 발견한 Data로 이야기를 이어가세요."
     : finalBlockComplete
       ? "호스트가 전체 행사를 종료할 때까지 함께 발견한 Data로 이야기를 이어가세요."
-      : "호스트가 새 조를 공개하면 이동할 자리를 안내할게요. 그동안 이야기를 이어가세요.";
+      : singleTeam ? "자리를 옮기지 않아도 돼요. 호스트가 다음 블록을 시작할 때까지 이야기를 이어가세요." : "호스트가 새 조를 공개하면 이동할 자리를 안내할게요. 그동안 이야기를 이어가세요.";
   return <div className="notice center" role="status"><strong>{title}</strong><p className="small muted">{description}</p></div>;
 }

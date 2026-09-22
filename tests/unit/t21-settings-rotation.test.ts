@@ -31,9 +31,45 @@ describe('T22 validated settings', () => {
     expect(() => getTeamKeys(27)).toThrow('INVALID_TEAM_COUNT');
     expect(() => parseGlobalConfig({ ...config, studentCount: 27, teamCount: 27 })).toThrow();
   });
+  it('accepts a participating host plus five students in one team only without rotation', () => {
+    const config = { ...DEFAULT_GLOBAL_CONFIG, studentCount: 5, teamCount: 1, moveCountPerTeam: 0, operatorTeamByName: {} };
+    expect(validateRosterConfig(config, roster(5, 1), 'p5')).toEqual(config);
+    expect(getTeamKeys(1)).toEqual(['A']);
+    expect(() => getTeamKeys(0)).toThrow('INVALID_TEAM_COUNT');
+    expect(() => parseGlobalConfig({ ...config, moveCountPerTeam: 1 })).toThrow();
+    expect(() => validateRosterConfig(config, roster(5, 2), 'p5')).toThrow('OPERATOR_COUNT_MISMATCH');
+  });
 });
 
 describe('T21 weighted rotation without fixed 18/3/3 assumptions', () => {
+  it('keeps every seat in a single team across all three blocks, independent of roster order', () => {
+    const config = { ...DEFAULT_GLOBAL_CONFIG, studentCount: 5, teamCount: 1, moveCountPerTeam: 0, operatorTeamByName: {} };
+    const people = roster(5, 1);
+    const initial = createInitialAssignments({ config, roster: people, rng: makeRng('single', 'initial') });
+    const activeStudentIds = people.filter((person) => person.role === 'student').map((person) => person.id).reverse();
+    const second = planRotation({ assignments: initial, activeStudentIds, moveCountPerTeam: 0, nextBlockNo: 2,
+      pairHistory: updatePairHistory(initial, []), rng: makeRng('single', 'second') });
+    expect(second.assignments).toEqual(initial);
+    expect(second.groups.find((group) => group.kind === 'moved')?.memberIds).toEqual([]);
+    const third = planRotation({ assignments: second.assignments, activeStudentIds, moveCountPerTeam: 0, nextBlockNo: 3,
+      pairHistory: updatePairHistory(second.assignments, updatePairHistory(initial, [])), previousGroups: second.groups,
+      rng: makeRng('single', 'third') });
+    expect(third.assignments).toEqual(initial);
+    expect(() => planRotation({ assignments: initial, moveCountPerTeam: 1, nextBlockNo: 2, pairHistory: [], rng: makeRng('single', 'invalid') })).toThrow('INVALID_MOVE_COUNT');
+  });
+  it('supports reducing to one team and then adding or removing a member without duplicate or missing seats', () => {
+    const config = { ...DEFAULT_GLOBAL_CONFIG, studentCount: 5, teamCount: 2, moveCountPerTeam: 0, operatorTeamByName: {} };
+    const initial = createInitialAssignments({ config, roster: roster(5, 2), rng: makeRng('single', 'merge') });
+    const targetTeams = [{ teamKey: 'A', operatorId: 'p5', studentCapacity: 5 }];
+    const merged = planRotation({ assignments: initial, targetTeams, moveCountPerTeam: 0, nextBlockNo: 2, pairHistory: [], rng: makeRng('single', 'merged') });
+    expect(merged.assignments).toHaveLength(6);
+    expect(new Set(merged.assignments.map((person) => person.participantId))).toEqual(new Set(['p0', 'p1', 'p2', 'p3', 'p4', 'p5']));
+    expect(merged.assignments.every((person) => person.teamKey === 'A')).toBe(true);
+    const activeStudentIds = merged.assignments.filter((person) => person.role === 'student' && person.participantId !== 'p0').map((person) => person.participantId).concat('new');
+    const changed = planRotation({ assignments: merged.assignments, targetTeams, activeStudentIds, moveCountPerTeam: 0, nextBlockNo: 3, pairHistory: [], rng: makeRng('single', 'changed') });
+    expect(changed.assignments.filter((person) => person.role === 'student').map((person) => person.participantId)).toEqual(activeStudentIds);
+    expect(changed.assignments.map((person) => person.seatNo)).toEqual([0, 1, 2, 3, 4, 5]);
+  });
   it.each([[18, 3, 3], [11, 4, 2], [7, 2, 1], [12, 3, 0]])('keeps seats, operators and exact moves for %i students/%i teams/%i moves', (students, teams, moves) => {
     const config = parseGlobalConfig({ ...DEFAULT_GLOBAL_CONFIG, studentCount: students, teamCount: teams, moveCountPerTeam: moves, operatorTeamByName: {} });
     const assignments = createInitialAssignments({ config, roster: roster(students, teams), rng: makeRng('initial', `${students}`) });

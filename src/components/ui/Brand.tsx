@@ -5,7 +5,7 @@ export function Rtan({ size = 36, className = "" }: { size?: number; className?:
 }
 
 export function Brand() {
-  return <div className="brand"><Rtan /><div className="brand-lockup">KANT<span>Mingling</span></div></div>;
+  return <div className="brand"><Image className="brand-logo" src="/brand/kant-k.png" width={36} height={36} alt="" unoptimized /><div className="brand-lockup">KANT<span>Mingling</span></div></div>;
 }
 
 export function WelcomeVisual() {

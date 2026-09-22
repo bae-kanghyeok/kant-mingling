@@ -77,7 +77,7 @@ export function Profile({ state, slug, send, onDone, persistence = requestJson }
     <SectionTitle label="My Data" title="나의 Data 만들기" description="20개의 질문에서 나와 더 가까운 답을 골라주세요. 이 응답이 Game의 Data가 됩니다." />
     <div className="profile-progress"><div><strong>{count} / 20</strong><span className="small muted" aria-live="polite">{saveState}</span></div><progress max={20} value={count} aria-label="프로필 입력 진행" /></div>
     <div className="profile-list">{questions.map((question, index) => <fieldset key={question.id} className="question-card" disabled={submitting || !state.profile?.editable}>
-      <legend><span className="question-number">{String(index + 1).padStart(2, "0")}</span><span>{question.category}</span></legend>
+      <legend><span className="question-number" aria-label={`질문 ${index + 1}`}>{String(index + 1).padStart(2, "0")}</span></legend>
       <div className="option-grid">{(["A", "B"] as const).map((option) => <label key={option} className={`profile-option ${answers[question.id] === option ? "selected" : ""}`}>
         <input type="radio" name={question.id} value={option} checked={answers[question.id] === option} onChange={() => choose(question.id, option)} /><span className="option-letter">{option}</span><span>{question.options[option]}</span><span className="option-tick" aria-hidden="true">{answers[question.id] === option ? "✓" : ""}</span>
       </label>)}</div>

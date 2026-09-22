@@ -6,7 +6,7 @@ const name = z.string().trim().min(1).max(40);
 export const rosterSchema = z.object({
   title: z.string().trim().min(1).max(100).default("KANT Mingle"),
   students: z.array(name).min(2),
-  operators: z.array(z.object({ name, team: z.string().regex(/^[A-Z]$/) }).strict()).min(2).max(26),
+  operators: z.array(z.object({ name, team: z.string().regex(/^[A-Z]$/) }).strict()).min(1).max(26),
   host: name,
   moveCountPerTeam: z.number().int().min(0).default(3),
   blockTargetMinutes: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]).default([12, 12, 15]),
@@ -15,6 +15,7 @@ export const rosterSchema = z.object({
   if (new Set(names).size !== names.length) ctx.addIssue({ code: "custom", message: "Display names must be unique." });
   if (!roster.operators.some((op) => op.name === roster.host)) ctx.addIssue({ code: "custom", message: "The host must be an operator." });
   if (roster.students.length < roster.operators.length || roster.moveCountPerTeam > Math.floor(roster.students.length / roster.operators.length)) ctx.addIssue({ code: "custom", message: "Invalid team capacity or rotation count." });
+  if (roster.operators.length === 1 && roster.moveCountPerTeam !== 0) ctx.addIssue({ code: "custom", path: ["moveCountPerTeam"], message: "A single team requires zero moving students." });
   const teams = roster.operators.map((op) => op.team).sort();
   if (teams.some((team, index) => team !== String.fromCharCode(65 + index))) ctx.addIssue({ code: "custom", message: "Operator teams must be unique consecutive keys beginning with A." });
 });

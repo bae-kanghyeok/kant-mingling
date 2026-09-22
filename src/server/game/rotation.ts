@@ -64,7 +64,8 @@ export function planRotation(input: RotationInput): RotationResult {
     if (!operator) throw new GameRuleError('INVALID_OPERATOR_ASSIGNMENT');
     return { teamKey, operatorId: operator.participantId, studentCapacity: currentStudents.filter((assignment) => assignment.teamKey === teamKey).length };
   });
-  if (targetTeams.length < 2 || new Set(targetTeams.map((team) => team.teamKey)).size !== targetTeams.length || new Set(targetTeams.map((team) => team.operatorId)).size !== targetTeams.length || targetTeams.some((team) => !Number.isInteger(team.studentCapacity) || team.studentCapacity < 1)) throw new GameRuleError('INVALID_TARGET_TEAMS');
+  if (targetTeams.length < 1 || new Set(targetTeams.map((team) => team.teamKey)).size !== targetTeams.length || new Set(targetTeams.map((team) => team.operatorId)).size !== targetTeams.length || targetTeams.some((team) => !Number.isInteger(team.studentCapacity) || team.studentCapacity < 1)) throw new GameRuleError('INVALID_TARGET_TEAMS');
+  if (targetTeams.length === 1 && moveCountPerTeam !== 0) throw new GameRuleError('INVALID_MOVE_COUNT');
   const activeIds = input.activeStudentIds ? [...input.activeStudentIds] : currentStudents.map((assignment) => assignment.participantId);
   const active = new Set(activeIds);
   if (active.size !== activeIds.length || activeIds.length !== targetTeams.reduce((sum, team) => sum + team.studentCapacity, 0)) throw new GameRuleError('STUDENT_CAPACITY_MISMATCH');
@@ -88,8 +89,17 @@ export function planRotation(input: RotationInput): RotationResult {
   }
   const pairs = new Map(input.pairHistory.map((pair) => [pairKey(pair.aId, pair.bId), pair.count]));
   const oldTriples = new Set((input.previousGroups ?? []).flatMap((group) => tripleKeys(group.memberIds)));
-  const samples = input.samples ?? 30_000;
-  if (!Number.isInteger(samples) || samples < 1) throw new GameRuleError('INVALID_SAMPLE_COUNT');
+  const requestedSamples = input.samples ?? 30_000;
+  if (!Number.isInteger(requestedSamples) || requestedSamples < 1) throw new GameRuleError('INVALID_SAMPLE_COUNT');
+  // A single team has only one destination. Keep existing seat order and append
+  // new members, instead of changing seats to match roster order between blocks.
+  const seatOrder = targetTeams.length === 1 ? [
+    ...currentStudents.filter((person) => active.has(person.participantId))
+      .sort((a, b) => Number(b.teamKey === targetTeams[0].teamKey) - Number(a.teamKey === targetTeams[0].teamKey) || a.teamKey.localeCompare(b.teamKey) || a.seatNo - b.seatNo)
+      .map((person) => person.participantId),
+    ...activeIds.filter((id) => !sourceById.has(id)),
+  ] : activeIds;
+  const samples = targetTeams.length === 1 ? 1 : requestedSamples;
   let best: RotationResult | null = null;
   let bestScore: number[] = [];
   let equalBest = 0;
@@ -116,7 +126,7 @@ export function planRotation(input: RotationInput): RotationResult {
     let sameSourceIncomingTriples = 0;
     let sameOperatorThreeBlocks = 0;
     for (const team of targetTeams) {
-      const ids = activeIds.filter((id) => destinations.get(id) === team.teamKey);
+      const ids = seatOrder.filter((id) => destinations.get(id) === team.teamKey);
       next.push({ participantId: team.operatorId, teamKey: team.teamKey, role: 'operator', seatNo: 0 });
       ids.forEach((id, index) => next.push({ participantId: id, teamKey: team.teamKey, role: 'student', seatNo: index + 1 }));
       const stayed = ids.filter((id) => sourceById.get(id) === team.teamKey);

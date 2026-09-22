@@ -12,6 +12,7 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 - **인원·역할 확장 계획:** [개선 로드맵](docs/evolution-roadmap.md)
 - **접속·DB 한도 문제:** [문제 해결 안내](docs/troubleshooting.md)
 - **외부에서 혼자 게임 검토:** [감독 리허설 안내](docs/remote-rehearsal.md) — develop · Preview 배포와 HTTP 검증 완료
+- **6명이 한 조로 직접 테스트:** [6인 리허설 안내](docs/six-person-rehearsal.md) — 호스트 1명도 게임 참여
 - **프로필 콘텐츠:** [20문항과 후속 대화 질문](docs/profile-questions.md)
 
 ```sh
@@ -43,7 +44,7 @@ Vercel Git 자동 배포는 별도로 연결해야 합니다. `main`을 Producti
 
 - 기본 18명 학생 + 운영진 3명, 3블록 × 3게임, 프로필 20문항
 - 인원·조 수 설정과 불균등 배정, 명단 관리, 호스트 이전 지원
-- 현재 제약은 **조마다 운영진 1명, 전체 호스트 1명**. 리허설은 21명 고정이며 임의 규모의 행사 검증을 의미하지 않습니다.
+- 현재 제약은 **조마다 운영진 1명, 전체 호스트 1명**. 한 조는 이동 인원 0명으로 진행합니다. 6인 실참여 행사와 별도로, 혼자 역할을 바꾸는 감독 리허설은 21명 고정입니다.
 - Data Split, Turn Lead, Noise, Ensemble, Ground Truth, 정답 공개와 후속 대화
 - 세션 복구, 명령 중복·동시성 제어, 관리자에게도 공개 전 정답 비노출
 
@@ -61,7 +62,7 @@ npm run test:db
 
 정식 행사 전 실제 스마트폰과 행사 Wi-Fi에서 리허설해야 합니다. 자동 검사와 로컬 시뮬레이션은 현장 네트워크·브라우저 조합 전체를 검증하지 않습니다.
 
-develop에서 디자인만 검토하려면 `npm run dev` 후 `/design-preview`를 엽니다. 등록·프로필·카드·투표·정답·관제 11개 화면을 합성 데이터로 전환할 수 있고 DB나 API는 호출하지 않습니다. Production 빌드에서는 404를 반환합니다.
+develop에서 디자인만 검토하려면 `npm run dev` 후 `/design-preview`를 엽니다. 등록·프로필·카드·투표·정답·관제 33개 화면을 합성 데이터로 전환할 수 있고 DB나 API는 호출하지 않습니다. Production 빌드에서는 404를 반환합니다.
 
 ## 코드와 디자인 자료
 

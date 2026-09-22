@@ -73,3 +73,11 @@ it("roster seeding rejects duplicate names and a student host", () => {
   expect(rosterSchema.safeParse({ ...valid, students: ["학생01", "학생01"] }).success).toBe(false);
   expect(rosterSchema.safeParse({ ...valid, host: "학생01" }).success).toBe(false);
 });
+it("roster seeding accepts one participating operator and five students only with zero moves", () => {
+  const roster = { students: ["학생01", "학생02", "학생03", "학생04", "학생05"],
+    operators: [{ name: "운영진A", team: "A" }], host: "운영진A", moveCountPerTeam: 0 };
+  expect(rosterSchema.safeParse(roster).success).toBe(true);
+  expect(rosterSchema.safeParse({ ...roster, moveCountPerTeam: 1 }).success).toBe(false);
+  expect(rosterSchema.safeParse({ ...roster, operators: [] }).success).toBe(false);
+  expect(rosterSchema.safeParse({ ...roster, operators: [{ name: "운영진A", team: "B" }] }).success).toBe(false);
+});

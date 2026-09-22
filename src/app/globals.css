@@ -180,6 +180,19 @@ summary span { float: right; color: var(--accent); }
 .choice-button.selected { border-color: var(--brand); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--brand); }
 .choice-button small { display: block; color: var(--accent); font-size: 9px; }
 .noise-picker { border-top: 1px solid var(--line); margin-top: 26px; padding-top: 18px; }
+.noise-choice-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+.noise-choice { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 16px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.noise-choice-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.noise-choice-heading > strong { font-family: var(--font-geist-mono), monospace; font-size: 12px; }
+.noise-choice-check { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); }
+.noise-choice.selected .noise-choice-check { border-color: var(--brand); background: var(--brand); color: white; }
+.noise-choice-question { display: flex; flex-direction: column; gap: 5px; line-height: 1.6; font-size: 13px; }
+.noise-choice-question > span:first-child, .noise-choice-vs { font-size: 11px; color: var(--muted); }
+.noise-choice-answer { display: flex; flex-direction: column; gap: 5px; line-height: 1.6; }
+.noise-choice-answer > span { font-size: 11px; color: var(--muted); }
+.noise-choice-answer strong { font-size: 15px; }
+.noise-choice-unreceived { display: flex; flex-direction: column; gap: 6px; line-height: 1.6; }
+.noise-choice-unreceived > span { color: var(--muted); font-size: 12px; }
 .pill { display: inline-block; padding: 8px 12px; border-radius: 99px; background: var(--accent-soft); color: #b1263b; font-size: 12px; margin-bottom: 16px; }
 .rule-symbol { font-size: 56px; color: var(--brand); margin: 10px 0 20px; }
 .verified-banner { border-radius: 12px; background: #edf7f0; padding: 24px; font-family: var(--font-geist-mono), monospace; margin: 18px 0; color: var(--success); }

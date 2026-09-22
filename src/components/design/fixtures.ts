@@ -57,6 +57,8 @@ const weather = questions.find((question) => question.options.A.includes("장마
 const otherQuestion = questions.find((question) => question.id !== weather.id) ?? questions[1];
 const thirdQuestion = questions.find((question) => question.id !== weather.id && question.id !== otherQuestion.id) ?? questions[2];
 const questionContext = (question: typeof questions[number]) => ({ category: question.category, options: question.options });
+export const previewGuessCards = (game: PublicGame) => game.cards.map((card) => ({ cardNo: card.cardNo,
+  question: card.question ?? questionContext(thirdQuestion), text: card.text ?? thirdQuestion.options.A }));
 
 const teamSettings: TeamSettings = {
   preset: "normal", dataSplitGames: [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -201,8 +203,13 @@ export function createPreviewState(view: PreviewView): PublicState {
   }
   if (view === "wrong") { game.guess!.enabled = false; game.guess!.locked = true; state.allowedActions = ["more-data"]; }
   if (view === "paused") { state.team!.paused = true; state.allowedActions = []; }
+  if (game.guess?.enabled && (game.guess.noiseCount ?? 0) > 0 && !game.pendingOverlay &&
+      game.phase === "TURN" && !state.team?.paused && game.turnLead?.participantId === state.me?.participantId) {
+    game.guess.cards = previewGuessCards(game);
+  }
   if (isAdminPreview(view)) {
     state.me = { ...operators[0], isHost: true, profileComplete: true, introsSeen: ["tutorial", "noise", "ensemble", "ground_truth"] };
+    game.guess = undefined;
     // This operator did not receive these cards. Show only public card metadata.
     game.cards = game.cards.map(({ cardNo, recipients }) => ({ cardNo, recipients }));
     state.admin = createAdmin();

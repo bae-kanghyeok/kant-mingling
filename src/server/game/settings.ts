@@ -10,7 +10,7 @@ const gameNumbers = z.array(z.number().int().min(1).max(9)).refine(
 
 export const globalConfigSchema = z.object({
   studentCount: z.number().int().min(2),
-  teamCount: z.number().int().min(2).max(26),
+  teamCount: z.number().int().min(1).max(26),
   moveCountPerTeam: z.number().int().min(0),
   operatorTeamByName: z.record(z.string().min(1), z.string().min(1)),
   blockTargetMinutes: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]),
@@ -25,6 +25,9 @@ export const globalConfigSchema = z.object({
   }
   if (value.moveCountPerTeam > Math.floor(value.studentCount / value.teamCount)) {
     ctx.addIssue({ code: 'custom', path: ['moveCountPerTeam'], message: '이동 인원은 가장 작은 조의 학생 정원을 넘을 수 없습니다.' });
+  }
+  if (value.teamCount === 1 && value.moveCountPerTeam !== 0) {
+    ctx.addIssue({ code: 'custom', path: ['moveCountPerTeam'], message: '한 조로 진행할 때는 자리 이동 인원을 0명으로 설정합니다.' });
   }
   if (new Set(Object.values(value.operatorTeamByName)).size !== Object.keys(value.operatorTeamByName).length) {
     ctx.addIssue({ code: 'custom', path: ['operatorTeamByName'], message: '한 조에 운영진은 한 명만 배치합니다.' });
@@ -87,7 +90,7 @@ export function applyPreset(settings: TeamSettings, preset: Preset): TeamSetting
 }
 
 export function getTeamKeys(count: number): string[] {
-  if (!Number.isInteger(count) || count < 2 || count > 26) throw new GameRuleError('INVALID_TEAM_COUNT');
+  if (!Number.isInteger(count) || count < 1 || count > 26) throw new GameRuleError('INVALID_TEAM_COUNT');
   return Array.from({ length: count }, (_, index) => String.fromCharCode(65 + index));
 }
 
