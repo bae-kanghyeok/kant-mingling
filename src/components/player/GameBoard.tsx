@@ -52,9 +52,12 @@ function Ensemble({ state, game, send, busy }: { state: PublicState; game: Publi
   return <section className="panel ensemble-panel"><p className="eyebrow">Ensemble 결과</p><h2>생각이 얼마나 같았을까요?</h2><p className="muted">정답 여부는 아직 공개되지 않습니다. 왜 그렇게 생각했는지 이야기해보세요.</p><div className="vote-results">{ensemble.results?.map((result) => <div className="vote-row" key={result.participantId}><span>{result.displayName}</span><div className="vote-track"><span style={{ width: `${result.votes / max * 100}%` }} /></div><strong>{result.votes}</strong></div>)}</div>{state.allowedActions.includes("ensemble-end-discussion") && <button className="button primary full" disabled={busy || state.team?.paused} onClick={() => command("ensemble-end-discussion")}>토론 마침</button>}</section>;
 }
 
-export function GameBoard({ state, game, send, busy }: { state: PublicState; game: PublicGame; send: SendAction; busy: boolean }) {
-  const [guessOpen, setGuessOpen] = useState(false);
-  const [wrongAt, setWrongAt] = useState<number | null>(null);
+export function GameBoard({ state, game, send, busy, initialGuessOpen = false, initialWrongFeedback = false }: {
+  state: PublicState; game: PublicGame; send: SendAction; busy: boolean;
+  initialGuessOpen?: boolean; initialWrongFeedback?: boolean;
+}) {
+  const [guessOpen, setGuessOpen] = useState(initialGuessOpen);
+  const [wrongAt, setWrongAt] = useState<number | null>(initialWrongFeedback ? game.cards.length : null);
   const isLead = game.turnLead?.participantId === state.me?.participantId;
   const latest = game.cards.at(-1);
   const ownCards = game.cards.filter((card) => card.text !== undefined);
@@ -88,4 +91,20 @@ export function WaitingRoom({ state }: { state: PublicState }) {
     <div className="team-ticket"><div className="team-letter">{state.nextBlock?.teamKey ?? state.team?.key ?? "?"}<span>Team</span></div><div><h2>{state.nextBlock ? `${state.nextBlock.seatNo}번 자리` : "함께할 사람들"}</h2><p>{state.nextBlock?.members.join(" · ") ?? state.team?.members.map((person) => person.displayName).join(" · ") ?? "조를 준비하고 있어요."}</p></div></div>
     <p className="notice">{state.team?.phase === "SEATING" ? "새 자리에 앉으면 운영진이 Game을 시작해요." : "잠시 후 Game이 시작됩니다."}</p>
   </>;
+}
+
+export function BlockDoneNotice({ state }: { state: PublicState }) {
+  const waitingForOthers = state.team?.waitingForOthers;
+  const finalBlockComplete = state.event.currentBlock === 3 && state.event.phase === "BLOCK" && !waitingForOthers;
+  const title = waitingForOthers
+    ? "다른 조의 Game이 끝나기를 기다리고 있어요."
+    : finalBlockComplete
+      ? "모든 조의 Game이 끝났어요. 마지막 대화를 나눠보세요."
+      : "새로운 사람들과 만나볼 시간입니다. 다음 조 안내를 기다려주세요.";
+  const description = waitingForOthers
+    ? "함께 발견한 Data로 이야기를 이어가세요."
+    : finalBlockComplete
+      ? "호스트가 전체 행사를 종료할 때까지 함께 발견한 Data로 이야기를 이어가세요."
+      : "호스트가 새 조를 공개하면 이동할 자리를 안내할게요. 그동안 이야기를 이어가세요.";
+  return <div className="notice center" role="status"><strong>{title}</strong><p className="small muted">{description}</p></div>;
 }

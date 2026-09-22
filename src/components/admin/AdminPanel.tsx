@@ -18,8 +18,12 @@ function ConnectionStatus({ online }: { online: boolean | undefined }) {
   return <span className={`connection-status ${online ? "online" : "offline"}`}>{online ? "온라인" : "오프라인"}</span>;
 }
 
-export function AdminPanel({ state, send, busy, onClose }: { state: PublicState; send: SendAction; busy: boolean; onClose: () => void }) {
-  const [tab, setTab] = useState("progress");
+export function AdminPanel({ state, send, busy, onClose, initialTab = "progress", commandFeedback }: {
+  state: PublicState; send: SendAction; busy: boolean; onClose: () => void;
+  initialTab?: "progress" | "people" | "settings" | "logs";
+  commandFeedback?: string;
+}) {
+  const [tab, setTab] = useState<string>(initialTab);
   const [teamKey, setTeamKey] = useState(state.team?.key ?? state.admin?.teams[0]?.key ?? "A");
   const [target, setTarget] = useState("");
   const [cardNo, setCardNo] = useState(1);
@@ -43,7 +47,7 @@ export function AdminPanel({ state, send, busy, onClose }: { state: PublicState;
       if (command === "ensemble-shared" || command === "ensemble-end-discussion") {
         await send(`/api/game/${command}`, { gameId: team?.gameId, gameVersion: team?.gameVersion });
       } else await send("/api/admin", { command, teamKey, expectedVersion, args });
-      setMessage(`${labels[command] ?? "변경"} 완료`);
+      setMessage(commandFeedback ?? `${labels[command] ?? "변경"} 완료`);
       return true;
     } catch (failure) { setMessage(failure instanceof Error ? failure.message : "잠시 후 다시 시도해주세요."); return false; }
   };

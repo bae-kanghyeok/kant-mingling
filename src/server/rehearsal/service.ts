@@ -7,6 +7,9 @@ import { getPool } from "../db/pool";
 import type { EventRow, SessionRow, TxContext } from "../db/types";
 import { createSessionToken, getRequestTokenHash, hashSessionToken, sessionCookieHeader, clearSessionCookieHeader } from "../auth/session";
 import { authenticateOperator, bootstrapSession } from "../services/registration";
+import { consumeRateLimit } from "../auth/rate-limit";
+import { verifyOperatorCode } from "../auth/operator-code";
+import { executeAdminCommand } from "../services/admin-service";
 import { executeGameCommand } from "../services/game-service";
 import { settleBlocks } from "../services/block-service";
 import { settleDeadlines } from "../db/tx";
@@ -14,12 +17,16 @@ import { CommandRejected, json, reject } from "../http/respond";
 import { assertRehearsalDeployment, assertSyntheticRehearsalRoster, type RehearsalPerson } from "./guards";
 import { cookieValue, operatorCodeDigest, parseSupervisorGrant, signSupervisorGrant, supervisorCookieHeader,
   SUPERVISOR_COOKIE, SUPERVISOR_MAX_AGE_SECONDS, type SupervisorGrant } from "./supervisor";
+import { restartSyntheticRehearsal } from "./reset-fixture.mjs";
 
 const commandSchema = z.discriminatedUnion("action", [
   z.object({ slug: z.string(), action: z.literal("enable"), code: z.string().min(1).max(128) }).strict(),
   z.object({ slug: z.string(), action: z.literal("switch"), participantId: z.uuid() }).strict(),
   z.object({ slug: z.string(), action: z.literal("assist") }).strict(),
   z.object({ slug: z.string(), action: z.literal("disable") }).strict(),
+  z.object({ slug: z.string(), action: z.literal("reset"), confirm: z.literal("RESET") }).strict(),
+  z.object({ slug: z.string(), action: z.literal("start") }).strict(),
+  z.object({ slug: z.string(), action: z.literal("focus-turn") }).strict(),
 ]);
 interface Context { client: PoolClient; event: EventRow; roster: RehearsalPerson[]; now: Date }
 interface HostSession extends SessionRow { operator_code_hash: string }
@@ -40,7 +47,11 @@ async function transaction<T>(slug: string, work: (context: Context) => Promise<
     const result = await work({ client, event, roster, now });
     await client.query("COMMIT");
     return result;
-  } catch (error) { await client.query("ROLLBACK").catch(() => {}); throw error; }
+  } catch (error) {
+    if (error instanceof CommandRejected && error.preserveWrites) await client.query("COMMIT");
+    else await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  }
   finally { client.release(); }
 }
 
@@ -69,6 +80,7 @@ async function selectedParticipant(context: Context, request: Request) {
 }
 function state(context: Context, selectedId: string | null, enabled: boolean, canEnable: boolean, expiresAt: number | null): RehearsalState {
   return { ok: true, enabled, canEnable, selectedParticipantId: selectedId, hostParticipantId: context.event.host_participant_id!,
+    eventPhase: context.event.phase,
     expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
     roster: context.roster.map(person => ({ participantId: person.id, displayName: person.display_name, role: person.role })) };
 }
@@ -85,9 +97,12 @@ export async function rehearsalState(request: Request, slug: string) {
 async function enable(request: Request, slug: string, code: string) {
   // Authenticate through the normal login services, even when an old selected
   // actor cookie remains after the supervisor session expires.
-  const hostId = await transaction(slug, async context => context.event.host_participant_id!);
+  const target = await transaction(slug, async context => ({ hostId: context.event.host_participant_id!, phase: context.event.phase }));
+  const hostId = target.hostId;
   const ip = process.env.VERCEL === "1" ? (request.headers.get("x-vercel-forwarded-for") ?? "unknown") : "local";
-  const session = await bootstrapSession({ slug, ipHash: hashSessionToken(`ip:${ip.split(",")[0].trim()}`) });
+  const ipHash = hashSessionToken(`ip:${ip.split(",")[0].trim()}`);
+  if (target.phase === "ENDED") return enableEnded(request, slug, code, ipHash);
+  const session = await bootstrapSession({ slug, ipHash });
   if (!session.token) reject(401, "UNAUTHENTICATED");
   const token = session.token;
   const authenticated = await authenticateOperator({ slug, tokenHash: hashSessionToken(token), requestId: randomUUID() }, { participantId: hostId, code });
@@ -97,15 +112,75 @@ async function enable(request: Request, slug: string, code: string) {
     if (!host) reject(401, "UNAUTHENTICATED");
     await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND token_hash=$2 AND id<>$4 AND revoked_at IS NULL",
       [context.event.id, getRequestTokenHash(request), context.now, host.id]);
-    const expiresAt = Math.min(host.expires_at.getTime(), context.now.getTime() + SUPERVISOR_MAX_AGE_SECONDS * 1000);
-    const grant: SupervisorGrant = { version: 1, slug, eventId: context.event.id, hostParticipantId: hostId,
-      hostToken: token, codeDigest: operatorCodeDigest(host.operator_code_hash), expiresAt };
-    const maxAge = (expiresAt - context.now.getTime()) / 1000;
-    const headers = new Headers();
-    headers.append("Set-Cookie", supervisorCookieHeader(signSupervisorGrant(grant), maxAge));
-    headers.append("Set-Cookie", sessionCookieHeader(token, maxAge));
-    return json(state(context, hostId, true, true, expiresAt), 200, headers);
+    return enabledResponse(context, host, token);
   });
+}
+
+function enabledResponse(context: Context, host: HostSession, token: string) {
+  const expiresAt = Math.min(host.expires_at.getTime(), context.now.getTime() + SUPERVISOR_MAX_AGE_SECONDS * 1000);
+  const grant: SupervisorGrant = { version: 1, slug: context.event.slug, eventId: context.event.id,
+    hostParticipantId: context.event.host_participant_id!, hostToken: token,
+    codeDigest: operatorCodeDigest(host.operator_code_hash), expiresAt };
+  const maxAge = (expiresAt - context.now.getTime()) / 1000;
+  const headers = new Headers();
+  headers.append("Set-Cookie", supervisorCookieHeader(signSupervisorGrant(grant), maxAge));
+  headers.append("Set-Cookie", sessionCookieHeader(token, maxAge));
+  return json(state(context, grant.hostParticipantId, true, true, expiresAt), 200, headers);
+}
+
+/** Re-enter only the guarded synthetic fixture after its ordinary event has ended. */
+async function enableEnded(request: Request, slug: string, code: string, ipHash: string) {
+  return transaction(slug, async context => {
+    const { client, event, now } = context;
+    if (event.phase !== "ENDED") reject(409, "WRONG_PHASE");
+    await consumeRateLimit(client, event.id, `rehearsal-ended-ip:${ipHash}`, 5, 300, now);
+    await consumeRateLimit(client, event.id, `rehearsal-ended-host:${event.host_participant_id}`, 30, 300, now);
+    const person = (await client.query<{ operator_code_hash: string }>(
+      "SELECT operator_code_hash FROM participants WHERE id=$1 AND event_id=$2 AND active AND role='operator' FOR UPDATE",
+      [event.host_participant_id, event.id])).rows[0];
+    if (!person || !await verifyOperatorCode(code, person.operator_code_hash)) reject(401, "BAD_CODE", true);
+    const token = createSessionToken();
+    await client.query(`UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND revoked_at IS NULL
+      AND (participant_id=$2 OR token_hash=$4)`, [event.id, event.host_participant_id, now, getRequestTokenHash(request)]);
+    await client.query("INSERT INTO sessions(event_id,participant_id,token_hash,expires_at) VALUES($1,$2,$3,$4)",
+      [event.id, event.host_participant_id, hashSessionToken(token), new Date(now.getTime() + SUPERVISOR_MAX_AGE_SECONDS * 1000)]);
+    const host = await validHostSession(context, hashSessionToken(token));
+    if (!host) reject(401, "UNAUTHENTICATED");
+    return enabledResponse(context, host, token);
+  });
+}
+
+async function switchParticipant(context: Context, request: Request, host: HostSession, grant: SupervisorGrant, participantId: string) {
+  const person = context.roster.find(person => person.id === participantId);
+  if (!person) reject(404, "NOT_FOUND");
+  // Only the original host session survives a role change.
+  await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND token_hash=$2 AND id<>$4 AND revoked_at IS NULL",
+    [context.event.id, getRequestTokenHash(request), context.now, host.id]);
+  let token = grant.hostToken;
+  if (person.id !== grant.hostParticipantId) {
+    token = createSessionToken();
+    await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND participant_id=$2 AND revoked_at IS NULL", [context.event.id, person.id, context.now]);
+    await context.client.query("INSERT INTO sessions(event_id,participant_id,token_hash,expires_at) VALUES($1,$2,$3,$4)",
+      [context.event.id, person.id, hashSessionToken(token), new Date(grant.expiresAt)]);
+  }
+  return json(state(context, person.id, true, person.id === grant.hostParticipantId, grant.expiresAt), 200,
+    { "Set-Cookie": sessionCookieHeader(token, (grant.expiresAt - context.now.getTime()) / 1000) });
+}
+
+async function quickStart(context: Context, host: HostSession) {
+  if (context.event.phase === "BLOCK") return;
+  if (context.event.phase !== "SETUP") reject(409, "WRONG_PHASE");
+  const ctx: TxContext = { ...context, session: host };
+  async function command(name: string) {
+    await executeAdminCommand(ctx, { command: name, expectedVersion: ctx.event.session_version });
+    ctx.event = (await ctx.client.query<EventRow>("SELECT * FROM events WHERE id=$1", [ctx.event.id])).rows[0];
+  }
+  if (!ctx.event.teams_published_at) {
+    if (!Array.isArray(ctx.event.draft_assignments)) await command("assign-teams");
+    await command("publish-teams");
+  }
+  await command("start-game1");
+  context.event = ctx.event;
 }
 
 /** Calls only ordinary game commands; never selects guesses using private answers. */
@@ -175,21 +250,25 @@ export async function rehearsalCommand(request: Request, input: unknown) {
       return json(state(context, null, false, false, null), 200, headers);
     }
     if (command.action === "switch") {
-      const person = context.roster.find(person => person.id === command.participantId);
-      if (!person) reject(404, "NOT_FOUND");
-      // Only the supervisor's original host session survives role changes.
-      // Otherwise an older tab could keep operating the previous actor.
-      await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND token_hash=$2 AND id<>$4 AND revoked_at IS NULL",
-        [context.event.id, getRequestTokenHash(request), context.now, host.id]);
-      let token = grant.hostToken;
-      if (person.id !== grant.hostParticipantId) {
-        token = createSessionToken();
-        await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND participant_id=$2 AND revoked_at IS NULL", [context.event.id, person.id, context.now]);
-        await context.client.query("INSERT INTO sessions(event_id,participant_id,token_hash,expires_at) VALUES($1,$2,$3,$4)",
-          [context.event.id, person.id, hashSessionToken(token), new Date(grant.expiresAt)]);
-      }
-      return json(state(context, person.id, true, person.id === grant.hostParticipantId, grant.expiresAt), 200,
-        { "Set-Cookie": sessionCookieHeader(token, (grant.expiresAt - context.now.getTime()) / 1000) });
+      return switchParticipant(context, request, host, grant, command.participantId);
+    }
+    if (command.action === "reset") {
+      context.event = await restartSyntheticRehearsal(context.client, { slug: command.slug, preserveSessionId: host.id });
+      return switchParticipant(context, request, host, grant, grant.hostParticipantId);
+    }
+    if (command.action === "start") {
+      await quickStart(context, host);
+      return switchParticipant(context, request, host, grant, grant.hostParticipantId);
+    }
+    if (command.action === "focus-turn") {
+      if (!selected) reject(401, "UNAUTHENTICATED");
+      const turn = (await context.client.query<{ participant_id: string | null }>(`SELECT
+        CASE WHEN g.phase IN ('ENSEMBLE_SHARE','ENSEMBLE_DISCUSS') THEN g.ensemble_sharer_id ELSE g.turn_lead_participant_id END AS participant_id
+        FROM block_assignments a JOIN team_blocks tb ON tb.event_id=a.event_id AND tb.team_id=a.team_id AND tb.block_no=a.block_no
+        JOIN games g ON g.id=tb.current_game_id WHERE a.event_id=$1 AND a.participant_id=$2 AND a.block_no=$3
+        AND g.phase<>'REVEALED'`, [context.event.id, selected, context.event.current_block])).rows[0];
+      if (!turn?.participant_id) reject(409, "WRONG_PHASE");
+      return switchParticipant(context, request, host, grant, turn.participant_id);
     }
     if (!selected) reject(401, "UNAUTHENTICATED");
     const assistedActions = await assist(context, host, selected);

@@ -1,30 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { PublicState } from "@/lib/contracts";
 import { AdminPanel } from "./admin/AdminPanel";
 import { Entry } from "./player/Entry";
-import { GameBoard, Reveal, WaitingRoom } from "./player/GameBoard";
+import { BlockDoneNotice, GameBoard, Reveal, WaitingRoom } from "./player/GameBoard";
 import { Profile } from "./player/Profile";
 import { StatusPanel } from "./ui/Modal";
 import { Brand } from "./ui/Brand";
 import { useMingleState } from "./useMingleState";
-
-function BlockDoneNotice({ state }: { state: PublicState }) {
-  const waitingForOthers = state.team?.waitingForOthers;
-  const finalBlockComplete = state.event.currentBlock === 3 && state.event.phase === "BLOCK" && !waitingForOthers;
-  const title = waitingForOthers
-    ? "다른 조의 Game이 끝나기를 기다리고 있어요."
-    : finalBlockComplete
-      ? "모든 조의 Game이 끝났어요. 마지막 대화를 나눠보세요."
-      : "새로운 사람들과 만나볼 시간입니다. 다음 조 안내를 기다려주세요.";
-  const description = waitingForOthers
-    ? "함께 발견한 Data로 이야기를 이어가세요."
-    : finalBlockComplete
-      ? "호스트가 전체 행사를 종료할 때까지 함께 발견한 Data로 이야기를 이어가세요."
-      : "호스트가 새 조를 공개하면 이동할 자리를 안내할게요. 그동안 이야기를 이어가세요.";
-  return <div className="notice center" role="status"><strong>{title}</strong><p className="small muted">{description}</p></div>;
-}
 
 export default function MingleApp({ slug }: { slug: string }) {
   const { state, error, terminal, disconnected, busy, send, refresh, clearError } = useMingleState(slug);

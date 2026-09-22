@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import type { RehearsalState } from "@/lib/rehearsal-contracts";
+import DesignPreview from "../design/DesignPreview";
 import { Brand } from "../ui/Brand";
+import { Modal } from "../ui/Modal";
 import styles from "./RehearsalController.module.css";
 
-type Action = "enable" | "switch" | "assist" | "disable";
+type Action = "enable" | "switch" | "assist" | "disable" | "reset" | "start" | "focus-turn";
 
 class RehearsalError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -43,9 +45,32 @@ const actionLabels: Record<Action, string> = {
   switch: "선택한 참가자의 화면으로 전환하고 있어요.",
   assist: "다른 참가자의 데모 응답을 반영하고 있어요.",
   disable: "리허설 감독을 종료하고 있어요.",
+  reset: "리허설을 처음 상태로 되돌리고 있어요.",
+  start: "조를 편성하고 첫 게임을 시작하고 있어요.",
+  "focus-turn": "지금 진행할 참가자의 화면을 찾고 있어요.",
 };
 
 export default function RehearsalController({ slug }: { slug: string }) {
+  const [mode, setMode] = useState<"tour" | "live">("tour");
+  const [working, setWorking] = useState(false);
+
+  return <div>
+    <div className={styles.shell}>
+      <header className={styles.header}><Brand /><span className={styles.liveBadge}>상사님용 게임 체험</span></header>
+      <nav className={styles.modes} aria-label="테스트 방법">
+        <button className={mode === "tour" ? styles.activeMode : styles.mode} aria-pressed={mode === "tour"} disabled={working} onClick={() => setMode("tour")}>
+          <strong>화면 둘러보기</strong><span>로그인 없이 모든 단계 바로 확인 · 저장 안 됨</span>
+        </button>
+        <button className={mode === "live" ? styles.activeMode : styles.mode} aria-pressed={mode === "live"} disabled={working} onClick={() => setMode("live")}>
+          <strong>실제 게임</strong><span>호스트 코드로 역할 전환 · DB에 진행 저장</span>
+        </button>
+      </nav>
+    </div>
+    {mode === "tour" ? <DesignPreview embedded /> : <LiveRehearsalController slug={slug} onWorkingChange={setWorking} />}
+  </div>;
+}
+
+function LiveRehearsalController({ slug, onWorkingChange }: { slug: string; onWorkingChange: (working: boolean) => void }) {
   const [snapshot, setSnapshot] = useState<RehearsalState | null>(null);
   const [selection, setSelection] = useState("");
   const [code, setCode] = useState("");
@@ -56,6 +81,7 @@ export default function RehearsalController({ slug }: { slug: string }) {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [frameMounted, setFrameMounted] = useState(false);
   const [frameVersion, setFrameVersion] = useState(0);
+  const [resetOpen, setResetOpen] = useState(false);
   const actionInFlight = useRef(false);
   const gamePanel = useRef<HTMLElement>(null);
   const focusGame = useRef(false);
@@ -100,6 +126,7 @@ export default function RehearsalController({ slug }: { slug: string }) {
   async function refresh() {
     if (actionInFlight.current) return;
     actionInFlight.current = true;
+    onWorkingChange(true);
     const reopen = frameMounted;
     flushSync(() => { setBusy("refresh"); setFrameMounted(false); setError(null); });
     try {
@@ -112,12 +139,14 @@ export default function RehearsalController({ slug }: { slug: string }) {
       setLoading(false);
       setBusy(null);
       actionInFlight.current = false;
+      onWorkingChange(false);
     }
   }
 
   async function run(action: Action, extra: Record<string, unknown> = {}) {
     if (actionInFlight.current) return;
     actionInFlight.current = true;
+    onWorkingChange(true);
     // Remove the old document before a response can change the shared game cookie.
     // Only the remounted iframe may start polling with the newly selected identity.
     flushSync(() => { setBusy(action); setFrameMounted(false); setError(null); setNotice(null); });
@@ -131,6 +160,9 @@ export default function RehearsalController({ slug }: { slug: string }) {
         ? `다른 참가자의 데모 동작 ${next.assistedActions}개를 반영했어요. 다음 진행은 게임 화면에서 확인해주세요.`
         : "지금 보조할 동작이 없어요. 현재 역할의 안내나 조의 진행 단계를 확인해주세요.");
       if (action === "disable") setNotice("리허설 감독을 종료했어요. 행사 진행과 프로필은 그대로 남아 있어요.");
+      if (action === "reset") { setResetOpen(false); setNotice("처음 상태로 되돌렸어요. 21명의 프로필이 준비되어 있으니 ‘게임 바로 시작’을 눌러주세요."); }
+      if (action === "start") setNotice("첫 게임이 준비됐어요. ‘현재 진행자 화면’으로 이동해 시작해보세요.");
+      if (action === "focus-turn") setNotice("현재 조에서 진행할 참가자로 전환했어요. 게임 화면의 안내대로 진행해주세요.");
     } catch (failure) {
       setError(failureMessage(failure));
       setNeedsRefresh(action !== "enable");
@@ -141,6 +173,7 @@ export default function RehearsalController({ slug }: { slug: string }) {
       setCode("");
       setBusy(null);
       actionInFlight.current = false;
+      onWorkingChange(false);
     }
   }
 
@@ -150,11 +183,10 @@ export default function RehearsalController({ slug }: { slug: string }) {
   }
 
   return <main className={styles.shell}>
-    <header className={styles.header}><Brand /><span className={styles.liveBadge}>실제 DB로 진행</span></header>
     <section className={styles.intro}>
-      <p className="eyebrow">온라인 합성 리허설</p>
-      <h1>혼자서도 함께하는 게임을 확인해요.</h1>
-      <p>합성 참가자 21명의 역할을 바꾸며 참가자 화면과 호스트 관제를 확인합니다. 화면 예시가 아닌, 개발 DB에 저장되는 실제 게임이에요.</p>
+      <p className="eyebrow">실제 DB로 진행하는 합성 리허설</p>
+      <h1>직접 조작하며 게임을 이어가요.</h1>
+      <p>합성 참가자 21명의 프로필이 준비되어 있어요. 호스트 인증 후 게임을 바로 시작하고, 역할을 바꿔 전체 진행을 확인하세요. 화면 둘러보기로 이동하면 실제 게임의 자동 조회를 멈추며 저장된 진행은 유지됩니다.</p>
     </section>
     <div className={styles.workspace}>
       <aside className={styles.controls} aria-label="리허설 감독">
@@ -174,6 +206,13 @@ export default function RehearsalController({ slug }: { slug: string }) {
         </form>}
 
         {enabled && <>
+          <section className={styles.controlSection}>
+            <h3>빠른 시작</h3>
+            <button className="button primary full" disabled={disabled || snapshot.eventPhase !== "SETUP"} onClick={() => void run("start")}>{snapshot.eventPhase === "SETUP" ? "게임 바로 시작" : "게임이 시작되었어요"}</button>
+            <button className="button secondary full" disabled={disabled || snapshot.eventPhase !== "BLOCK"} onClick={() => void run("focus-turn")}>현재 진행자 화면</button>
+            <p className={styles.hint}>첫 시작은 조 편성부터 Game 1까지 자동으로 준비해요. 진행자 버튼은 현재 조의 Turn Lead 또는 Ensemble 공유자로 전환합니다.</p>
+            <button className={styles.resetButton} disabled={disabled} onClick={() => setResetOpen(true)}>처음부터 다시 시작</button>
+          </section>
           <section className={styles.controlSection}>
             <label htmlFor="rehearsal-participant">참가자 역할</label>
             <select id="rehearsal-participant" value={selection} onChange={(event) => setSelection(event.target.value)} disabled={disabled}>
@@ -196,7 +235,7 @@ export default function RehearsalController({ slug }: { slug: string }) {
         <button className={styles.refreshButton} disabled={busy !== null} onClick={() => void refresh()}>상태 새로고침</button>
         <details className={styles.help}>
           <summary>리허설 진행 방법</summary>
-          <ol><li>호스트 코드로 로그인하고 게임 화면을 엽니다.</li><li>호스트 ‘관리자’ 화면에서 조 편성과 전체 시작을 진행합니다.</li><li>역할을 바꿔 각 참가자에게 보이는 단서를 확인합니다.</li><li>다른 참가자의 확인·공유·투표가 필요할 때 데모 응답을 누릅니다.</li><li>호스트로 돌아가 다음 Game, 자리 이동, 전체 종료를 확인합니다.</li></ol>
+          <ol><li>호스트 코드로 로그인하고 ‘게임 바로 시작’을 누릅니다.</li><li>‘현재 진행자 화면’에서 단서 요청과 추리를 해봅니다.</li><li>확인·공유·투표에 다른 참가자가 필요하면 ‘다른 참가자 데모 응답’을 누릅니다.</li><li>참가자 역할을 바꿔 다른 조나 운영진의 화면을 확인합니다.</li><li>호스트로 돌아가 ‘관리자’에서 다음 블록, 자리 이동, 종료를 제어합니다.</li><li>다시 해보려면 ‘처음부터 다시 시작’을 누릅니다.</li></ol>
           <p>선택한 역할이 받을 수 있는 Data만 보입니다. 공개 전 정답과 다른 사람의 Data를 모아 보여주는 기능은 없어요.</p>
         </details>
       </aside>
@@ -220,5 +259,13 @@ export default function RehearsalController({ slug }: { slug: string }) {
         <p className={styles.frameNote}>게임 화면은 한 번에 하나만 연결합니다. 쉬어갈 때는 화면을 잠시 닫거나 리허설 감독을 종료해주세요.</p>
       </section>
     </div>
+    {resetOpen && <Modal title="리허설을 처음부터 다시 할까요?" onClose={busy ? undefined : () => setResetOpen(false)}>
+      <p className={styles.resetDescription}>이 리허설의 게임 진행, 조 편성, 투표와 기록을 지우고 합성 참가자 21명의 프로필을 다시 채웁니다. 기존 운영진 코드는 계속 사용할 수 있어요.</p>
+      <div className={styles.resetActions}>
+        <button className="button secondary" disabled={busy !== null} onClick={() => setResetOpen(false)}>취소</button>
+        <button className="button primary" disabled={busy !== null} onClick={() => void run("reset", { confirm: "RESET" })}>{busy === "reset" ? "초기화 중…" : "초기화하고 다시 준비"}</button>
+      </div>
+      {error && <p className={styles.error} role="alert">{error}</p>}
+    </Modal>}
   </main>;
 }

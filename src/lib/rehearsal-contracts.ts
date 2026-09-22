@@ -5,6 +5,7 @@ export interface RehearsalState {
   selectedParticipantId: string | null;
   hostParticipantId: string;
   expiresAt: string | null;
+  eventPhase: "SETUP" | "BLOCK" | "BREAK" | "ENDED";
   roster: {
     participantId: string;
     displayName: string;

@@ -1,6 +1,7 @@
 import "server-only";
 import { developmentConnectionString } from "../db/database-target.mjs";
 import { reject } from "../http/respond";
+import { isSyntheticRehearsalRoster } from "./reset-fixture.mjs";
 
 /** An opt-in Preview/local feature; a production deployment always fails closed. */
 export function assertRehearsalDeployment(slug: string) {
@@ -25,13 +26,5 @@ export interface RehearsalPerson {
 
 /** A fixed synthetic fixture only. A dev-looking slug alone is insufficient. */
 export function assertSyntheticRehearsalRoster(people: RehearsalPerson[]) {
-  if (people.length !== 21) reject(404, "NOT_FOUND");
-  const ordered = [...people].sort((a, b) => a.roster_order - b.roster_order);
-  for (let index = 0; index < ordered.length; index++) {
-    const person = ordered[index];
-    const student = index < 18;
-    const expectedName = student ? `학생${String(index + 1).padStart(2, "0")}` : `운영진${"ABC"[index - 18]}`;
-    if (!person.active || person.roster_order !== index + 1 || person.display_name !== expectedName ||
-      person.role !== (student ? "student" : "operator")) reject(404, "NOT_FOUND");
-  }
+  if (!isSyntheticRehearsalRoster(people)) reject(404, "NOT_FOUND");
 }

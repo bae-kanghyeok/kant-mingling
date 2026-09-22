@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "rehearsal": "npm run build && node scripts/rehearsal.mjs",
+    "rehearsal:reset": "node scripts/restart-dev-rehearsal.mjs",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "db:check": "node scripts/check-db.mjs",

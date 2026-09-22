@@ -1,5 +1,14 @@
 .shell { width: min(100%, 1520px); margin: 0 auto; padding: 0 28px 40px; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 92px; border-bottom: 1px solid var(--line-soft); }
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 24px; }
+.mode, .activeMode { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--secondary); text-align: left; cursor: pointer; }
+.activeMode { border-color: var(--accent); background: var(--accent-soft); }
+.mode strong, .activeMode strong { font-size: 16px; color: var(--foreground); }
+.mode span, .activeMode span { font-size: 12px; line-height: 1.6; }
+.mode:disabled, .activeMode:disabled { opacity: .6; cursor: wait; }
+.resetButton { min-height: 42px; border: 1px solid #efbbc5; border-radius: 10px; background: var(--surface); color: #a82139; font-size: 12px; cursor: pointer; }
+.resetDescription { color: var(--secondary); font-size: 14px; line-height: 1.9; }
+.resetActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .liveBadge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid #f0bac4; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 750; white-space: nowrap; }
 .liveBadge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .intro { padding: 30px 0; }
@@ -54,6 +63,10 @@
   .emptyFrame { min-height: 280px; }
 }
 @media (max-width: 480px) {
+  .modes { gap: 10px; padding-top: 16px; }
+  .mode, .activeMode { padding: 14px 12px; }
+  .mode strong, .activeMode strong { font-size: 14px; }
+  .mode span, .activeMode span { font-size: 11px; }
   .shell { padding: 0 12px 24px; }
   .header { min-height: 80px; flex-wrap: wrap; gap: 8px; padding: 16px 6px; }
   .liveBadge { font-size: 10px; }

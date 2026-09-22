@@ -29,9 +29,12 @@ export function Tutorial({ onDone }: { onDone: () => void }) {
   </section>;
 }
 
-export function Entry({ state, send, busy }: { state: PublicState; send: SendAction; busy: boolean }) {
-  const [step, setStep] = useState<"welcome" | "tutorial" | "names">("welcome");
-  const [operator, setOperator] = useState<PublicState["roster"] extends (infer T)[] | undefined ? T | null : never>(null);
+export function Entry({ state, send, busy, initialStep = "welcome", initialOperatorId }: {
+  state: PublicState; send: SendAction; busy: boolean;
+  initialStep?: "welcome" | "tutorial" | "names"; initialOperatorId?: string;
+}) {
+  const [step, setStep] = useState(initialStep);
+  const [operator, setOperator] = useState<PublicState["roster"] extends (infer T)[] | undefined ? T | null : never>(() => state.roster?.find((person) => person.role === "operator" && person.participantId === initialOperatorId) ?? null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const claim = async (participantId: string, operatorCode?: string) => {
