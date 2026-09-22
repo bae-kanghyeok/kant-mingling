@@ -19,7 +19,7 @@
 
 ## 불변 조건
 
-1. `AGENTS.md`를 읽는다. 프레임워크를 수정할 때는 설치된 Next.js의 해당 로컬 문서도 읽는다. 행사 게임 규칙은 설치 편의를 이유로 바꾸지 않는다.
+1. `AGENTS.md`, `README.md`, `docs/architecture.md`를 읽는다. 프레임워크를 수정할 때는 설치된 Next.js의 해당 로컬 문서도 읽는다. 행사 게임 규칙은 설치 편의를 이유로 바꾸지 않는다.
 2. `.env*`는 **열람·출력하지 않는다**. 파일 목록·존재 여부 확인은 가능하고, 저장소 스크립트가 실행 시 환경을 로드하는 것은 허용한다. 환경 덤프, 연결 URL, DB 드라이버 원본 오류·stack을 출력하지 않는다.
 3. 실제 명단·프로필 응답·쿠키·운영진 코드·회사 디자인 원본을 공개 저장소에 넣지 않는다. 공개 예시는 합성 이름만 사용한다.
 4. `DATABASE_URL`은 런타임용이고 `DATABASE_URL_UNPOOLED`는 migration용 direct 연결이다. 둘은 같은 대상 DB를 가리켜야 한다.
@@ -106,6 +106,17 @@ Vercel은 사용자의 새 프로젝트, Next.js preset, Node 24.x, 저장소 �
 
 Git Import 시 첫 배포가 Production일 수 있다. 현재 범위가 Preview뿐이면 Production에 실제 DB를 연결하거나 실제 행사를 준비하지 않는다. 필요하면 CLI의 명시적 Preview 배포를 사용한다. 저장소 build command에 migration·seed를 끼워 넣지 않는다.
 
+CLI로 진행할 때의 실행 예시는 다음과 같다. `<...>`는 확인한 본인 프로젝트·scope·배포 URL로 바꾸고 매 단계의 결과를 확인한다. 아래 명령 자체가 환경변수를 등록하지는 않으므로 앞 단계에서 Vercel Preview 변수를 준비해야 한다.
+
+```text
+npx vercel@59.23.2 link --project <project-name> --scope <scope>
+npx vercel@59.23.2 deploy --target preview --yes --scope <scope>
+npx vercel@59.23.2 inspect <deployment-url> --scope <scope>
+npx vercel@59.23.2 curl /api/health --deployment <deployment-url> --scope <scope>
+```
+
+한글 컴퓨터 이름 때문에 CLI의 HTTP 헤더 오류가 발생하면 `scripts/vercel-ascii-hostname.cjs`를 `NODE_OPTIONS`의 `--require`로 그 프로세스에만 적용한다. 원래 `NODE_OPTIONS` 값을 보존·복원하고 운영체제 호스트명은 바꾸지 않는다.
+
 **통과 조건:** 배포 Ready, HTTPS `/api/health` 정상, 합성 `/e/<slug>` 로드, 올바른 환경 대상 확인. Preview 보호 정책 때문에 사용자 접근이 막히면 배포 실패와 구분해 전달한다.
 
 ## E. 운영 준비와 배포
@@ -131,6 +142,8 @@ node scripts/issue-operator-codes.mjs --slug our-mingling --production --approve
 코드 수령 단계가 필요하다고 해서 나머지 준비·문서화까지 중단하지 않는다. 아직 발급하지 않았다면 완료 보고에 그 상태를 분명히 남긴다.
 
 승인된 안정 commit을 Production에 배포한다. Vercel target·project·commit을 확인하고 `/api/health`, `/e/<slug>` 및 실제 운영진 입장을 검증한다. 실 참가자 대신 답변·추리·투표를 제출하거나 행사 시작·종료를 실행하는 것은 별도 운영 동작이다. 설치 확인은 필요 이상의 게임 상태 변경 없이 수행한다.
+
+운영 배포까지 승인된 경우의 CLI는 `npx vercel@59.23.2 deploy --prod --yes --scope <scope>`다. 실행 전에 현재 `.vercel` 연결 프로젝트와 source commit을 확인하고, 이후 `inspect`로 실제 target이 production인지 확인한다. 승인되지 않은 경우 이 명령을 실행하지 않는다.
 
 ## F. 완료 기준과 결과 보고
 

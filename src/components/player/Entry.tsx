@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { PublicState } from "@/lib/contracts";
 import type { SendAction } from "../useMingleState";
 import { Modal, SectionTitle } from "../ui/Modal";
+import { WelcomeSteps, WelcomeVisual } from "../ui/Brand";
 
 const slides = [
   { title: "우리 중 한 명이 Data Owner입니다", body: "Data Owner는 본인도 자신이 선택됐는지 모릅니다.", detail: "공개되는 Data를 보고 우리 조의 Data Owner를 찾아보세요.", symbol: "?" },
@@ -43,9 +44,10 @@ export function Entry({ state, send, busy }: { state: PublicState; send: SendAct
   };
   if (step === "tutorial") return <Tutorial onDone={() => setStep("names")} />;
   if (step === "welcome") return <section className="welcome">
-    <div className="welcome-art" aria-hidden="true"><span className="art-card card-back">A</span><span className="art-card card-front">?</span><span className="art-dot" /></div>
-    <p className="eyebrow">Let’s get to know each other</p><h1>Whose<br /><em>Data?</em></h1><h2>우리 중 한 명이 Data Owner입니다.</h2><p className="muted">데이터는 각자의 폰에 흩어져 있습니다. 서로 이야기해 Data Owner를 찾아보세요.</p>
-    <button className="button primary full" onClick={() => setStep("tutorial")}>게임 방법 보기 <span aria-hidden="true">→</span></button>
+    <div className="welcome-layout"><div className="welcome-copy">
+      <p className="hero-kicker">Let’s get to know each other</p><h1>Whose<br /><em>Data?</em></h1><h2>우리 중 한 명이 Data Owner입니다.</h2><p className="muted">데이터는 각자의 폰에 흩어져 있습니다. 서로 이야기해 Data Owner를 찾아보세요.</p>
+      <button className="button primary full" onClick={() => setStep("tutorial")}>게임 방법 보기 <span aria-hidden="true">→</span></button>
+    </div><WelcomeVisual /></div><WelcomeSteps />
   </section>;
   return <>
     <SectionTitle label="Check in" title="내 이름을 선택해주세요" description="오늘 함께할 얼굴들, 이름부터 만나봐요." />

@@ -11,3 +11,13 @@
 - 검증은 lint, typecheck, 단위 테스트, 콘텐츠 검사, build를 기본으로 한다. DB 변경은 개발 환경의 관련 통합 테스트를 실행한다.
 - 기존 migration은 수정하지 않고 새 migration을 추가한다. 개발 DB 검사는 endpoint 고정값과 app_environment 표지를 함께 검증하며 우회하지 않는다.
 - 완료 보고에는 변경·검증·남은 제한을 기록한다. 검증하지 않은 규모나 브라우저 지원을 단정하지 않는다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

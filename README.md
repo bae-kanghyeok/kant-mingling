@@ -10,6 +10,7 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 - **AI 에이전트에게 맡길 때:** [에이전트 실행 지침](docs/install-agent.md), [AGENTS.md](AGENTS.md)
 - **게임과 코드 구조:** [기술 개요](docs/architecture.md)
 - **인원·역할 확장 계획:** [개선 로드맵](docs/evolution-roadmap.md)
+- **접속·DB 한도 문제:** [문제 해결 안내](docs/troubleshooting.md)
 - **프로필 콘텐츠:** [20문항과 후속 대화 질문](docs/profile-questions.md)
 
 ```sh
@@ -58,6 +59,8 @@ npm run test:db
 ```
 
 정식 행사 전 실제 스마트폰과 행사 Wi-Fi에서 리허설해야 합니다. 자동 검사와 로컬 시뮬레이션은 현장 네트워크·브라우저 조합 전체를 검증하지 않습니다.
+
+develop에서 디자인만 검토하려면 `npm run dev` 후 `/design-preview`를 엽니다. 등록·프로필·카드·투표·정답·관제 11개 화면을 합성 데이터로 전환할 수 있고 DB나 API는 호출하지 않습니다. Production 빌드에서는 404를 반환합니다.
 
 ## 코드와 디자인 자료
 

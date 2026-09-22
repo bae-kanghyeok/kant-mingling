@@ -7,6 +7,7 @@ import { Entry } from "./player/Entry";
 import { GameBoard, Reveal, WaitingRoom } from "./player/GameBoard";
 import { Profile } from "./player/Profile";
 import { StatusPanel } from "./ui/Modal";
+import { Brand } from "./ui/Brand";
 import { useMingleState } from "./useMingleState";
 
 function BlockDoneNotice({ state }: { state: PublicState }) {
@@ -46,7 +47,8 @@ export default function MingleApp({ slug }: { slug: string }) {
   else content = <><WaitingRoom state={state} />{state.allowedActions.includes("start-block-game") && <button className="button primary full" disabled={busy} onClick={() => control("start-block-game")}>Game 시작</button>}{state.profile?.editable && <button className="text-button" onClick={() => setEditProfile(true)}>내 프로필 수정</button>}{state.lastReveal?.reveal && <details className="personal-data"><summary>지난 Game 다시 보기</summary><Reveal game={state.lastReveal} /></details>}</>;
 
   return <main className="app-shell">
-    <header className="app-header"><div className="brand">KANT<span>Mingling</span><i aria-hidden="true">✳</i></div>{state?.me ? <div className="identity"><span>{state.team?.key && <b>{state.team.key}</b>}{state.me.displayName}</span>{state.admin && !ended && <button className="admin-trigger" onClick={() => setAdminOpen(true)}>관리자</button>}</div> : <span className="header-caption">Whose Data?</span>}</header>
+    <header className="app-header"><Brand />{state?.me ? <div className="identity"><span>{state.team?.key && <b>{state.team.key}</b>}{state.me.displayName}</span>{state.admin && !ended && <button className="admin-trigger" onClick={() => setAdminOpen(true)}>관리자</button>}</div> : <span className="header-caption">Whose Data?</span>}</header>
+    {state?.me && state.event.currentBlock > 0 && !ended && <nav className="game-context" aria-label="행사 진행"><span>함께 알아가는 시간</span><ol>{[1, 2, 3].map(block => <li key={block} aria-current={block === state.event.currentBlock ? "step" : undefined}><span>{block}</span><span>블록</span></li>)}</ol></nav>}
     {disconnected && !ended && !terminal && <div className="connection-warning" role="status"><span>연결을 다시 확인하고 있어요. 화면은 곧 최신 상태로 맞춰져요.</span><button onClick={() => void refresh().catch(() => {})}>다시 연결</button></div>}
     {error && <div className="error-message app-error" role="alert"><span>{error}</span><button className="icon-button" aria-label="오류 안내 닫기" onClick={clearError}>×</button></div>}
     <div className="page-content">{content}</div>

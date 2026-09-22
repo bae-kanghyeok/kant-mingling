@@ -5,6 +5,7 @@ import type { CardQuestion, PublicGame, PublicState } from "@/lib/contracts";
 import type { SendAction } from "../useMingleState";
 import { SectionTitle, StatusPanel } from "../ui/Modal";
 import { GuessModal, RuleOverlay } from "./GameOverlays";
+import { Rtan } from "../ui/Brand";
 
 const number = (value: number) => String(value).padStart(2, "0");
 
@@ -18,7 +19,7 @@ function CardContent({ question, text, answerLabel = "선택한 답변" }: { que
 export function Reveal({ game }: { game: PublicGame }) {
   if (!game.reveal) return null;
   return <section className="reveal">
-    <header className="reveal-header"><p className="eyebrow">Data Owner Found!</p><div className="owner-avatar" aria-hidden="true">✳</div><h2>이번 Data Owner는<br /><em>{game.reveal.owner.displayName}</em>님이었습니다!</h2></header>
+    <header className="reveal-header"><p className="eyebrow">Data Owner Found!</p><div className="owner-avatar" aria-hidden="true"><Rtan size={80} /></div><h2>이번 Data Owner는<br /><em>{game.reveal.owner.displayName}</em>님이었습니다!</h2></header>
     <div className="behind-card"><p className="eyebrow">Behind the Data</p><p>{game.reveal.behind.choiceText}</p><h3>{game.reveal.behind.followUp}</h3></div>
     <details className="reveal-data" open><summary>함께 모은 Data · {game.reveal.cards.length}</summary><div className="data-list">{game.reveal.cards.map((card) => <article key={card.cardNo} className={`data-card compact ${card.status === "NOISE" ? "noise-revealed" : ""}`}>
       <div className="card-meta"><span>Data {number(card.cardNo)}</span><span className="badge">{card.status === "GROUND_TRUTH" ? "Ground Truth" : card.status === "NOISE" ? "Noise" : "Real"}</span></div><CardContent question={card.question} text={card.text} answerLabel={card.status === "NOISE" ? "공개됐던 답변 (Noise)" : "선택한 답변"} />{card.ownerActualText && <p className="actual-answer">실제 답 · {card.ownerActualText}</p>}

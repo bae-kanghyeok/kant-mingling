@@ -66,7 +66,7 @@ export function AdminPanel({ state, send, busy, onClose }: { state: PublicState;
     return true;
   };
   const button = (command: string, args = {}) => can(command) && validForTeam(command) && <button key={command} className={`button ${command.includes("end") ? "danger-outline" : "secondary"}`} disabled={busy} onClick={() => void run(command, args)}>{labels[command] ?? command}</button>;
-  return <Modal title="관리자" onClose={onClose} wide>
+  return <Modal title="관리자" onClose={onClose} wide className="admin-panel">
     <p className="small muted">관리자 화면에서도 정답 정보는 공개되지 않습니다.</p>
     <nav className="admin-tabs" aria-label="관리자 메뉴">{[["progress", "진행"], ["people", "참가자"], ["settings", "설정"], ["logs", "로그"]].map(([key, label]) => <button key={key} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
     {message && <p className="notice" role="status">{message}</p>}

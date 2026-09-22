@@ -6,7 +6,7 @@ import type { PublicState } from "@/lib/contracts";
 import { ApiError, requestJson, type ApiResult, type SendAction } from "../useMingleState";
 import { SectionTitle } from "../ui/Modal";
 
-export function Profile({ state, slug, send, onDone }: { state: PublicState; slug: string; send: SendAction; onDone?: () => void }) {
+export function Profile({ state, slug, send, onDone, persistence = requestJson }: { state: PublicState; slug: string; send: SendAction; onDone?: () => void; persistence?: typeof requestJson }) {
   const [answers, setAnswers] = useState(state.profile?.answers ?? {});
   const [saveState, setSaveState] = useState(Object.keys(state.profile?.answers ?? {}).length === 20 ? "답변이 저장되었어요" : "모든 질문에 답하면 다음 단계로 갈 수 있어요.");
   const [submitting, setSubmitting] = useState(false);
@@ -32,14 +32,14 @@ export function Profile({ state, slug, send, onDone }: { state: PublicState; slu
         const option = desired.current[id];
         if (!option) break;
         try {
-          const response = await requestJson<ApiResult>("/api/profile", { slug, questionId: id, option, revision: revisions.current[id] ?? 0 }, "PATCH");
+          const response = await persistence<ApiResult>("/api/profile", { slug, questionId: id, option, revision: revisions.current[id] ?? 0 }, "PATCH");
           const revision = response.revision ?? response.data?.revision;
           revisions.current[id] = typeof revision === "number" ? revision : (revisions.current[id] ?? 0) + 1;
           saved.current[id] = option;
           conflicts = 0;
         } catch (failure) {
           if (failure instanceof ApiError && failure.code === "STALE_REVISION" && conflicts++ < 3) {
-            const fresh = await requestJson<PublicState>(`/api/state?slug=${encodeURIComponent(slug)}`, undefined, "GET");
+            const fresh = await persistence<PublicState>(`/api/state?slug=${encodeURIComponent(slug)}`, undefined, "GET");
             revisions.current[id] = fresh.profile?.revisions[id] ?? 0;
             saved.current[id] = fresh.profile?.answers[id];
             continue;

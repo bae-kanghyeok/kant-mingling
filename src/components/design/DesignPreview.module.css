@@ -1,0 +1,12 @@
+.tools { max-width: 1100px; margin: 24px auto 0; padding: 20px; border: 1px dashed var(--primary, #f64d66); border-radius: 18px; background: var(--surface, #fff); }
+.tools h1 { margin: 0 0 6px; font-size: 20px; }
+.tools p { margin: 0 0 16px; color: var(--muted, #74737c); font-size: 13px; }
+.views { display: flex; flex-wrap: wrap; gap: 8px; }
+.viewButton { border: 1px solid #e3e1e6; background: #fff; color: #45424e; border-radius: 99px; padding: 8px 13px; cursor: pointer; font-size: 13px; }
+.viewButton[aria-pressed="true"] { background: #d92d43; border-color: #d92d43; color: #fff; }
+.viewButton:focus-visible { outline: 3px solid #9f83d7; outline-offset: 3px; }
+.secondaryTools { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; }
+.notice { margin-top: 12px; padding: 10px 16px; background: #27232f; color: #fff; border-radius: 10px; font-size: 13px; }
+.watermark { margin: 0 auto 16px; max-width: calc(100% - 16px); width: max-content; background: #ffedf0; border: 1px solid #f6bbc6; border-radius: 99px; padding: 5px 12px; color: #8e3445; font-size: 11px; font-weight: 700; }
+.profileNote { padding: 12px 16px; border-radius: 12px; background: #ffedf0; font-size: 13px; margin-bottom: 16px; }
+@media (max-width: 600px) { .tools { margin: 12px 12px 0; padding: 16px; } .viewButton { padding: 8px 10px; } .watermark { font-size: 10px; } }
