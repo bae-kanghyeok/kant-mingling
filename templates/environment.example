@@ -7,3 +7,6 @@ AUTH_SECRET=
 DEVELOPMENT_NEON_ENDPOINT=
 # Separate production endpoint; required for production tooling.
 PRODUCTION_NEON_ENDPOINT=
+# Optional: enable only for one synthetic event in local/Preview.
+REHEARSAL_ENABLED=false
+REHEARSAL_EVENT_SLUG=

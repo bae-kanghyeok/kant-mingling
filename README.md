@@ -11,6 +11,7 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 - **게임과 코드 구조:** [기술 개요](docs/architecture.md)
 - **인원·역할 확장 계획:** [개선 로드맵](docs/evolution-roadmap.md)
 - **접속·DB 한도 문제:** [문제 해결 안내](docs/troubleshooting.md)
+- **외부에서 혼자 게임 검토:** [감독 리허설 안내](docs/remote-rehearsal.md) — develop 구현·배포 검증 중
 - **프로필 콘텐츠:** [20문항과 후속 대화 질문](docs/profile-questions.md)
 
 ```sh

@@ -1,0 +1,70 @@
+.shell { width: min(100%, 1520px); margin: 0 auto; padding: 0 28px 40px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 92px; border-bottom: 1px solid var(--line-soft); }
+.liveBadge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid #f0bac4; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 750; white-space: nowrap; }
+.liveBadge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.intro { padding: 30px 0; }
+.intro h1 { margin-bottom: 12px; font-size: clamp(1.6rem, 3vw, 2.1rem); }
+.intro > p:last-child { max-width: 840px; color: var(--muted); font-size: 13px; }
+.workspace { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; gap: 22px; }
+.controls { min-width: 0; padding: 23px; border: 1px solid var(--line-soft); border-radius: 22px; background: var(--surface); }
+.controlHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.controlHeading h2 { font-size: 18px; }
+.onBadge, .offBadge { padding: 4px 8px; border-radius: 7px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.onBadge { background: #eaf6ee; color: var(--success); }
+.offBadge { background: var(--surface-soft); color: var(--muted); }
+.description { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.feedback, .error { margin-top: 16px; padding: 13px 14px; border-radius: 12px; font-size: 12px; line-height: 1.75; }
+.feedback { background: var(--surface-soft); color: var(--secondary); }
+.error { border: 1px solid #efbbc5; background: var(--accent-soft); color: #a82139; }
+.login, .controlSection { display: flex; flex-direction: column; gap: 12px; padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--line-soft); }
+.login h3, .controlSection h3 { font-size: 14px; }
+.login p { color: var(--muted); font-size: 12px; }
+.login input { margin-top: 0 !important; }
+.controlSection select { margin-top: 0 !important; font-size: 13px; }
+.hint { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.login .hint { font-size: 11px; }
+.endButton, .refreshButton { display: block; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--secondary); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
+.endButton { margin-top: 22px; color: #a82139; }
+.refreshButton { margin-top: 16px; }
+.help { margin-top: 12px; border-top: 1px solid var(--line-soft); }
+.help summary { font-size: 12px; }
+.help ol { margin: 0 0 16px; padding-left: 19px; color: var(--secondary); font-size: 12px; }
+.help li + li { margin-top: 9px; }
+.help p { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.gamePanel { min-width: 0; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: var(--surface); }
+.gameHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--line-soft); }
+.gameHeader h2 { margin-top: 3px; font-size: 18px; }
+.gameEyebrow { color: var(--muted); font-size: 10px; }
+.frame { display: block; width: 100%; min-height: 760px; height: min(1100px, 85dvh); border: 0; background: var(--background); }
+.emptyFrame { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 520px; padding: 40px 28px; background: var(--background); text-align: center; }
+.emptyMark { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 22px; border-radius: 22px; background: var(--accent-soft); color: var(--accent); font-size: 30px; }
+.emptyFrame h3 { margin-bottom: 14px; font-size: 20px; }
+.emptyFrame p { max-width: 400px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.frameNote { padding: 13px 20px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 11px; }
+@media (max-width: 1000px) {
+  .shell { padding: 0 20px 32px; }
+  .workspace { grid-template-columns: minmax(250px, 290px) minmax(0, 1fr); gap: 16px; }
+  .controls { padding: 20px; }
+}
+@media (max-width: 760px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .intro { padding: 25px 0; }
+  .controls { padding: 22px; }
+  .frame { min-height: 680px; height: 85dvh; }
+  .emptyFrame { min-height: 280px; }
+}
+@media (max-width: 480px) {
+  .shell { padding: 0 12px 24px; }
+  .header { min-height: 80px; flex-wrap: wrap; gap: 8px; padding: 16px 6px; }
+  .liveBadge { font-size: 10px; }
+  .intro { padding: 24px 6px; }
+  .intro > p:last-child { font-size: 12px; }
+  .controls { padding: 20px; border-radius: 18px; }
+  .gamePanel { border-radius: 18px; }
+  .gameHeader { padding: 16px; }
+  .gameHeader h2 { font-size: 16px; }
+  .frame { min-height: 640px; }
+  .frameNote { padding: 12px 16px; }
+  .emptyFrame { padding: 32px 22px; }
+  .emptyFrame h3 { font-size: 18px; }
+}
