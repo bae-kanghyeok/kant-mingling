@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import RehearsalController from "@/components/rehearsal/RehearsalController";
+import DesignPreview from "@/components/design/DesignPreview";
 import { assertRehearsalDeployment } from "@/server/rehearsal/guards";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +10,13 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function RehearsalPage({ params }: PageProps<"/rehearsal/[slug]">) {
+export default async function RehearsalPage({ params, searchParams }: PageProps<"/rehearsal/[slug]">) {
   const { slug } = await params;
   try {
     assertRehearsalDeployment(slug);
   } catch {
     notFound();
   }
+  if ((await searchParams).view === "tour") return <DesignPreview />;
   return <RehearsalController slug={slug} />;
 }

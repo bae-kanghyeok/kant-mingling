@@ -3,6 +3,12 @@ import type { AdminView, Person, PublicGame, PublicState } from "@/lib/contracts
 import type { GlobalConfig, TeamSettings } from "@/server/game/settings";
 
 export const previewScenarios = [
+  { key: "gm-tutorial", label: "GM 방식 · 게임 방법", group: "GM 방식 · 최신", description: "진행자와 함께 선택·이유를 나누고 추리하는 방식을 안내합니다." },
+  { key: "gm-talk", label: "참가자 · 대화 중", group: "GM 방식 · 최신", description: "참가자는 추가 단서를 직접 넘기지 않고, GM이 추리를 열 때까지 대화를 나눕니다." },
+  { key: "gm-guess", label: "참가자 · 추리 열림", group: "GM 방식 · 최신", description: "GM이 추리를 열면 현재 추리 담당자에게 제출 버튼이 활성화됩니다." },
+  { key: "gm-remote", label: "GM 리모컨", group: "GM 방식 · 최신", description: "GM이 다음 단서를 전하거나 추리를 열고 닫습니다. 정답은 미리 보이지 않습니다." },
+  { key: "gm-reveal", label: "GM · 다음 판 설정", group: "GM 방식 · 최신", description: "정답 공개 뒤 대화를 이어가고, 다음 판의 Noise 최대 개수와 확실한 단서를 설정합니다." },
+  { key: "gm-rotation", label: "GM · 조 이동 준비", group: "GM 방식 · 최신", description: "현재 판과 대화를 마친 조부터 준비 완료를 누릅니다. 모두 준비되면 총괄 GM이 새 조를 공개합니다." },
   { key: "entry", label: "첫 입장", group: "등록 · 준비", description: "QR 링크로 처음 들어왔을 때의 환영 화면입니다." },
   { key: "tutorial", label: "게임 방법", group: "등록 · 준비", description: "Data Owner, 단서 공유, Turn Lead를 세 장으로 안내합니다." },
   { key: "names", label: "이름 선택", group: "등록 · 준비", description: "학생은 이름을 선택하고, 운영진은 추가 코드 인증을 받습니다." },
@@ -40,7 +46,7 @@ export const previewScenarios = [
 export type PreviewView = typeof previewScenarios[number]["key"];
 export const previewViews = previewScenarios.map(({ key, label }) => [key, label] as const);
 export const previewGroups = [...new Set(previewScenarios.map(({ group }) => group))];
-export const isAdminPreview = (view: PreviewView) => view === "admin" || view.startsWith("admin-");
+export const isAdminPreview = (view: PreviewView) => view === "admin" || view.startsWith("admin-") || ["gm-remote", "gm-reveal", "gm-rotation"].includes(view);
 
 const students: Person[] = Array.from({ length: 18 }, (_, index) => ({
   participantId: `design-student-${index + 1}`,
@@ -110,6 +116,31 @@ function createAdmin(): AdminView {
 
 /** Synthetic display fixtures only. No server state, credentials or hidden game fields. */
 export function createPreviewState(view: PreviewView): PublicState {
+  if (view.startsWith("gm-")) {
+    const base = createPreviewState(view === "gm-tutorial" ? "tutorial" : view === "gm-reveal" || view === "gm-rotation" ? "reveal" : view === "gm-remote" ? "admin" : "turn-lead");
+    base.event = { ...base.event, gameplayMode: "gm", teamCount: 3, rotationRequested: view === "gm-rotation" };
+    if (base.game) {
+      base.game.gm = { guessOpen: view === "gm-guess" };
+      if (base.game.guess) base.game.guess.enabled = view === "gm-guess";
+      if (view !== "gm-guess") delete base.game.guess?.cards;
+    }
+    base.allowedActions = view === "gm-guess" ? ["guess", "intro-ack"] : ["intro-ack"];
+    if (isAdminPreview(view)) {
+      base.me = { ...operators[0], isHost: true, profileComplete: true, introsSeen: ["tutorial", "noise", "ensemble", "ground_truth"] };
+      base.admin = createAdmin();
+      base.admin.globalSettings!.gameplayMode = "gm";
+      for (const team of base.admin.teams) { team.settings.gm = { noiseCap: 1, groundTruth: false }; team.rotationReady = false; }
+      base.game!.guess = undefined;
+      base.game!.cards = base.game!.cards.map(({ cardNo, recipients }) => ({ cardNo, recipients }));
+      const own = base.admin.teams[0];
+      own.phase = base.team!.phase; own.stage = base.game!.phase;
+      base.allowedActions = ["end-session", "update-team-settings", "update-global-settings", "unlock-participant"];
+      if (view === "gm-remote") base.allowedActions.push("next-card", "open-guess", "pause", "force-end-game", "request-rotation");
+      else if (view === "gm-reveal") base.allowedActions.push("gm-next-game", "request-rotation");
+      else base.allowedActions.push("rotation-ready", "cancel-rotation");
+    }
+    return base;
+  }
   const game = createGame();
   const state: PublicState = {
     serverNow: syntheticNow, poll: { intervalMs: 5000, needsSync: false },

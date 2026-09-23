@@ -10,7 +10,7 @@ try {
   if (!options.roster?.endsWith(".local.json")) throw new Error("Roster files must use the ignored .local.json suffix.");
   const roster = rosterSchema.parse(JSON.parse(await readFile(resolve(projectRoot, options.roster), "utf8")));
   if (target.environment === "development" && (!roster.students.every((value) => /^학생\d{2,}$/.test(value)) || !roster.operators.every((op) => /^운영진[A-Z]+$/.test(op.name)))) throw new Error("Only synthetic names are accepted by development seed.");
-  const config = { studentCount: roster.students.length, teamCount: roster.operators.length, moveCountPerTeam: roster.moveCountPerTeam,
+  const config = { ...(roster.gameplayMode ? { gameplayMode: roster.gameplayMode } : {}), studentCount: roster.students.length, teamCount: roster.operators.length, moveCountPerTeam: roster.moveCountPerTeam,
     operatorTeamByName: Object.fromEntries(roster.operators.map((op) => [op.name, op.team])), blockTargetMinutes: roster.blockTargetMinutes,
     sessionTtlHours: 24, presenceWindowSeconds: 15, pollInGameMs: 2000, pollIdleMs: 5000, voteSeconds: 30 };
   const content = JSON.parse(await readFile(resolve(projectRoot, "src/content/questions.v2.json"), "utf8"));

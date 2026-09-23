@@ -3,12 +3,14 @@ import 'server-only';
 import { z } from 'zod';
 import { GameRuleError, type RosterEntry } from './types';
 
-const gameNumbers = z.array(z.number().int().min(1).max(9)).refine(
+export const MAX_EVENT_ROUND = 32767;
+const gameNumbers = z.array(z.number().int().min(1).max(MAX_EVENT_ROUND)).refine(
   (values) => new Set(values).size === values.length,
   'GAME 번호는 중복될 수 없습니다.',
 );
 
 export const globalConfigSchema = z.object({
+  gameplayMode: z.enum(['classic', 'gm']).optional(),
   studentCount: z.number().int().min(2),
   teamCount: z.number().int().min(1).max(26),
   moveCountPerTeam: z.number().int().min(0),
@@ -35,6 +37,7 @@ export const globalConfigSchema = z.object({
 });
 
 export const teamSettingsSchema = z.object({
+  gm: z.object({ noiseCap: z.number().int().min(0).max(5), groundTruth: z.boolean() }).strict().optional(),
   preset: z.enum(['easy', 'normal', 'hard', 'custom']),
   dataSplitGames: gameNumbers,
   noiseGames: gameNumbers.refine((games) => !games.includes(1), 'GAME 1은 Noise를 사용하지 않습니다.'),
@@ -79,6 +82,18 @@ export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
 
 export const parseGlobalConfig = (value: unknown): GlobalConfig => globalConfigSchema.parse(value);
 export const parseTeamSettings = (value: unknown): TeamSettings => teamSettingsSchema.parse(value);
+
+export const isGmMode = (config: Pick<GlobalConfig, 'gameplayMode'>): boolean => config.gameplayMode === 'gm';
+export const DEFAULT_GM_SETTINGS = { noiseCap: 1, groundTruth: false } as const;
+
+/** Per-game feature choices never depend on the current seat round or a 9-game list. */
+export function gmGameSettings(base: TeamSettings, gameNo: number): TeamSettings {
+  const gm = gameNo === 1 ? { noiseCap: 0, groundTruth: false } : (base.gm ?? DEFAULT_GM_SETTINGS);
+  return parseTeamSettings({ ...base, gm, dataSplitGames: [gameNo],
+    noiseGames: gm.noiseCap ? [gameNo] : [], noiseCap: gm.noiseCap, noiseAutoAdd: true,
+    ensembleGames: [gameNo], groundTruthGames: gm.groundTruth ? [gameNo] : [],
+    groundTruthPerGame: gm.groundTruth ? 1 : 0 });
+}
 
 export function applyPreset(settings: TeamSettings, preset: Preset): TeamSettings {
   const changes = {

@@ -2,7 +2,7 @@ import "server-only";
 import type { AdminView, IntroKey, Person, PublicGame, PublicState } from "@/lib/contracts";
 import { getQuestion } from "@/content/catalog";
 import { loadStateSnapshot, type EventSnapshot, type SnapshotGame, type SnapshotPerson } from "../db/snapshot";
-import { DEFAULT_TEAM_SETTINGS, type TeamSettings } from "../game/settings";
+import { DEFAULT_TEAM_SETTINGS, isGmMode, MAX_EVENT_ROUND, type TeamSettings } from "../game/settings";
 import { getReferenceTimers } from "../game/timers";
 import { selectBehindData } from "../game/behind";
 import { makeRng } from "../game/rng";
@@ -17,7 +17,8 @@ const settings = (value: TeamSettings): TeamSettings => {
   return { preset: v.preset, dataSplitGames: [...v.dataSplitGames], noiseGames: [...v.noiseGames], noiseFirstRange: [...v.noiseFirstRange],
     noiseAutoAdd: v.noiseAutoAdd, noiseCap: v.noiseCap, groundTruthGames: [...v.groundTruthGames], groundTruthPerGame: v.groundTruthPerGame,
     gtRealCardsAfterEnsemble: v.gtRealCardsAfterEnsemble, ensembleGames: [...v.ensembleGames], ensembleTriggerOverride: v.ensembleTriggerOverride,
-    rareFromRealOrdinal: v.rareFromRealOrdinal, guessEnableAfter: { game1: v.guessEnableAfter.game1, others: v.guessEnableAfter.others } };
+    rareFromRealOrdinal: v.rareFromRealOrdinal, guessEnableAfter: { game1: v.guessEnableAfter.game1, others: v.guessEnableAfter.others },
+    ...(v.gm ? { gm: { noiseCap: v.gm.noiseCap, groundTruth: v.gm.groundTruth } } : {}) };
 };
 const online = (s: EventSnapshot, id: string) => s.sessions.some((session) => session.participant_id === id && !session.revoked_at &&
   (ms(session.expires_at) ?? 0) > (ms(s.now) ?? 0) && (ms(session.last_seen_at) ?? 0) >= (ms(s.now) ?? 0) - s.event.config_json.presenceWindowSeconds * 1000);
@@ -40,10 +41,12 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
   const isRevealed = game.phase === "REVEALED";
   const config = settings(game.config_snapshot);
   const isLead = lead?.id === me.id;
+  const gm = isGmMode(s.event.config_json);
   const noiseCount = cards.filter((card) => card.is_noise).length;
   const guessThreshold = game.game_no === 1 ? config.guessEnableAfter.game1 : config.guessEnableAfter.others;
   const out: PublicGame = {
     gameId: game.id, gameNo: game.game_no, phase: game.phase, turnLead: lead ? named(lead) : null,
+    ...(gm ? { gm: { guessOpen: !!game.gm_guess_open && !isRevealed } } : {}),
     candidates: members.map(named), exhausted: game.exhausted,
     cards: cards.map((card) => {
       const recipientIds = new Set(s.deliveries.filter((delivery) => delivery.card_id === card.id).map((delivery) => delivery.participant_id));
@@ -53,8 +56,10 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
         ...(gtCard?.id === card.id ? { verified: true as const } : {}) };
     }),
   };
-  if (isLead && !isRevealed) out.guess = { enabled: game.phase === "TURN" && !block?.paused_at && cards.length >= guessThreshold && !game.guess_locked,
-    locked: game.guess_locked, ...(intros.includes("noise") ? { noiseCount } : {}) };
+  if (isLead && !isRevealed) {
+    const enabled = game.phase === "TURN" && !block?.paused_at && cards.length >= guessThreshold && !game.guess_locked && (!gm || !!game.gm_guess_open);
+    out.guess = { enabled, locked: game.guess_locked, ...(enabled && intros.includes("noise") ? { noiseCount } : {}) };
+  }
   if (gtCard) out.groundTruth = { cardNo: gtCard.card_no };
   const sharer = members.find((p) => p.id === game.ensemble_sharer_id);
   if (sharer && game.phase.startsWith("ENSEMBLE_") && game.ensemble_trigger_no !== null) {
@@ -72,7 +77,8 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
   if (!isRevealed) {
     if (game.phase.startsWith("ENSEMBLE_") && !intros.includes("ensemble")) out.pendingOverlay = { kind: "ensemble" };
     else if (gtCard && !s.overlays.some((row) => row.game_id === game.id && row.participant_id === me.id && row.kind === "ground_truth")) out.pendingOverlay = { kind: "ground_truth", cardNo: gtCard.card_no };
-    else if (cards.length >= guessThreshold && noiseCount > 0 && !intros.includes("noise")) out.pendingOverlay = { kind: "noise", cardCount: cards.length, noiseCount };
+    else if (cards.length >= guessThreshold && noiseCount > 0 && !intros.includes("noise")) out.pendingOverlay = {
+      kind: "noise", cardCount: cards.length, ...(!gm ? { noiseCount } : {}) };
   }
   // Only an eligible Turn Lead may review team-delivered wording while choosing Noise.
   // Keep ordinary cards recipient-scoped and never include which option is true/Noise.
@@ -116,16 +122,18 @@ function adminDto(s: EventSnapshot, me: SnapshotPerson, isHost: boolean): AdminV
     const game = s.games.find((g) => g.id === block?.current_game_id);
     const participants = s.people.filter((p) => currentAssignments.some((a) => a.team_id === team.id && a.participant_id === p.id));
     return { key: team.team_key, operatorName: s.people.find((p) => p.id === team.operator_participant_id)?.display_name ?? "미배정",
+      ...(isGmMode(s.event.config_json) ? { rotationReady: !!block?.rotation_ready } : {}),
       phase: block?.phase ?? "SEATING", paused: !!block?.paused_at, gameNo: game?.game_no ?? null,
       revealedCount: game ? s.cards.filter((card) => card.game_id === game.id).length : 0, stage: game?.phase ?? null,
       turnLeadName: s.people.find((p) => p.id === game?.turn_lead_participant_id)?.display_name ?? null,
       members: participants.map((p) => ({ ...person(p), online: online(s, p.id), profileComplete: !!p.profile_completed_at, attendance: p.attendance })),
       timers: getReferenceTimers({ nowMs: ms(s.now)!, gameStartedAtMs: ms(game?.started_at), revealedAtMs: ms(game?.revealed_at),
         pausedMsTotal: game?.paused_ms_total ?? 0, pausedAtMs: ms(block?.paused_at), blockStartedAtMs: ms(block?.started_at),
-        blockTargetMinutes: s.event.config_json.blockTargetMinutes[Math.max(0, s.event.current_block - 1)] }),
+        blockTargetMinutes: s.event.config_json.blockTargetMinutes[Math.min(2, Math.max(0, s.event.current_block - 1))] }),
       settings: settings(block?.settings_json ?? team.settings_json), canControl: isHost || team.operator_participant_id === me.id,
       version: block?.team_version ?? s.event.session_version, ...(game ? { gameId: game.id, gameVersion: game.game_version } : {}) };
-  }), recentLogs: s.logs.map((log) => ({ command: log.command, actorName: s.people.find((p) => p.id === log.actor_participant_id)?.display_name ?? "시스템", target: log.target, at: log.created_at })) };
+  }), recentLogs: s.logs.filter((log) => !["COMMON_CARD_FALLBACK", "RARE_CARD_FALLBACK", "owner_fallback"].includes(log.command))
+    .map((log) => ({ command: log.command, actorName: s.people.find((p) => p.id === log.actor_participant_id)?.display_name ?? "시스템", target: log.target, at: log.created_at })) };
   admin.registration = s.people.map((p) => {
     const draft = s.event.pending_roster_json?.find((row) => row.id === p.id);
     return { participantId: p.id, displayName: draft?.displayName ?? p.display_name, role: draft?.role ?? p.role,
@@ -136,6 +144,7 @@ function adminDto(s: EventSnapshot, me: SnapshotPerson, isHost: boolean): AdminV
   if (isHost) {
     const v = s.event.pending_config_json ?? s.event.config_json;
     admin.globalSettings = { studentCount: v.studentCount, teamCount: v.teamCount, moveCountPerTeam: v.moveCountPerTeam,
+      ...(v.gameplayMode ? { gameplayMode: v.gameplayMode } : {}),
       operatorTeamByName: Object.fromEntries(Object.entries(v.operatorTeamByName)), blockTargetMinutes: [...v.blockTargetMinutes],
       sessionTtlHours: v.sessionTtlHours, presenceWindowSeconds: v.presenceWindowSeconds, pollInGameMs: v.pollInGameMs, pollIdleMs: v.pollIdleMs, voteSeconds: v.voteSeconds };
     const plan = s.event.phase === "SETUP" ? s.event.draft_assignments : s.event.phase === "BREAK" ? s.event.next_block_plan?.assignments : null;
@@ -148,13 +157,15 @@ export function buildPublicState(s: EventSnapshot): PublicState {
   if (!s.session) reject(401, "UNAUTHENTICATED");
   const me = s.people.find((p) => p.id === s.session?.participant_id && p.active);
   const isHost = me?.role === "operator" && me.id === s.event.host_participant_id;
+  const gm = isGmMode(s.event.config_json);
+  const gmEvent = gm ? { gameplayMode: "gm" as const, rotationRequested: !!s.event.rotation_requested } : {};
   const intros = s.intros.filter((row) => row.participant_id === me?.id).map((row) => row.intro_key);
   if (s.event.phase === "ENDED") {
     if (!me) reject(410, "ENDED");
     const previous = s.games.filter((g) => g.phase === "REVEALED" && s.members.some((m) => m.game_id === g.id && m.participant_id === me.id))
       .sort((a, b) => (ms(b.revealed_at) ?? 0) - (ms(a.revealed_at) ?? 0))[0];
     return { serverNow: s.now, poll: { intervalMs: s.event.config_json.pollIdleMs, needsSync: false },
-      versions: { session: s.event.session_version }, event: { slug: s.event.slug, title: s.event.title, phase: "ENDED", currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount },
+      versions: { session: s.event.session_version }, event: { slug: s.event.slug, title: s.event.title, phase: "ENDED", currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount, ...gmEvent },
       me: { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros }, allowedActions: [],
       ...(previous ? { lastReveal: gameDto(s, previous, me, intros) } : {}) };
   }
@@ -165,7 +176,7 @@ export function buildPublicState(s: EventSnapshot): PublicState {
   const needsSync = s.games.some((g) => g.phase === "ENSEMBLE_VOTE" && g.vote_deadline && ms(g.vote_deadline)! <= ms(s.now)! && !s.blocks.find((b) => b.id === g.team_block_id)?.paused_at);
   const out: PublicState = { serverNow: s.now, poll: { intervalMs: block?.phase === "IN_GAME" ? s.event.config_json.pollInGameMs : s.event.config_json.pollIdleMs, needsSync },
     versions: { session: s.event.session_version, ...(block ? { team: block.team_version } : {}) },
-    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount },
+    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount, ...gmEvent },
     me: me ? { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros } : null, allowedActions: [] };
   if (!me) {
     out.roster = s.people.filter((p) => p.active).map((p) => ({ ...person(p), locked: locked(s, p.id) }));
@@ -191,11 +202,12 @@ export function buildPublicState(s: EventSnapshot): PublicState {
       const control = me.role === "operator" && (isHost || team.operator_participant_id === me.id);
       if (!block?.paused_at) {
         if (game.phase === "TURN" && game.turn_lead_participant_id === me.id) {
-          if (!game.exhausted) out.allowedActions.push("more-data");
+          if (!gm && !game.exhausted) out.allowedActions.push("more-data");
           if (out.game.guess?.enabled) out.allowedActions.push("guess");
         }
-        if (game.phase === "ENSEMBLE_SHARE" && (control || game.ensemble_sharer_id === me.id)) out.allowedActions.push("ensemble-shared");
-        if (game.phase === "ENSEMBLE_DISCUSS" && (control || game.ensemble_sharer_id === me.id)) out.allowedActions.push("ensemble-end-discussion");
+        if (gm && control && game.phase === "TURN" && !game.exhausted) out.allowedActions.push("next-card");
+        if (game.phase === "ENSEMBLE_SHARE" && (control || (!gm && game.ensemble_sharer_id === me.id))) out.allowedActions.push("ensemble-shared");
+        if (game.phase === "ENSEMBLE_DISCUSS" && (control || (!gm && game.ensemble_sharer_id === me.id))) out.allowedActions.push("ensemble-end-discussion");
         if (game.phase === "ENSEMBLE_VOTE" && ms(game.vote_deadline)! > ms(s.now)!) out.allowedActions.push("ensemble-vote");
       }
     }
@@ -210,7 +222,11 @@ export function buildPublicState(s: EventSnapshot): PublicState {
     out.allowedActions.push("unlock-participant", "mark-attendance");
     if (isHost) {
       out.allowedActions.push("transfer-host", "update-global-settings", "end-session");
-      if (s.event.current_block < 3) out.allowedActions.push("upsert-participant", "remove-participant");
+      if (gm || s.event.current_block < 3) out.allowedActions.push("upsert-participant", "remove-participant");
+      if (gm && s.event.phase === "BLOCK") {
+        if (s.event.rotation_requested) out.allowedActions.push("cancel-rotation");
+        else if (s.event.current_block < MAX_EVENT_ROUND) out.allowedActions.push("request-rotation");
+      }
       if (s.event.phase === "SETUP") {
         out.allowedActions.push("assign-teams");
         if (s.event.draft_assignments) out.allowedActions.push("publish-teams", "swap-seats");
@@ -220,10 +236,21 @@ export function buildPublicState(s: EventSnapshot): PublicState {
     }
     const controlled = out.admin.teams.filter((t) => t.canControl);
     if (controlled.length) out.allowedActions.push("update-team-settings", "apply-preset");
-    if (s.event.phase === "BLOCK" && controlled.some((t) => t.phase === "SEATING")) out.allowedActions.push("start-block-game");
-    if (controlled.some((t) => t.phase === "REVEAL")) out.allowedActions.push("next-game");
+    if (s.event.phase === "BLOCK" && !s.event.rotation_requested && controlled.some((t) => t.phase === "SEATING")) out.allowedActions.push("start-block-game");
+    if (!s.event.rotation_requested && controlled.some((t) => t.phase === "REVEAL")) out.allowedActions.push(gm ? "gm-next-game" : "next-game");
+    if (gm && s.event.rotation_requested && s.event.phase === "BLOCK" && controlled.some((t) => ["SEATING", "REVEAL"].includes(t.phase))) out.allowedActions.push("rotation-ready");
     if (controlled.some((t) => t.phase === "IN_GAME")) out.allowedActions.push("force-end-game");
-    if (controlled.some((t) => t.phase === "IN_GAME" && ["TURN", "ENSEMBLE_SHARE"].includes(t.stage ?? ""))) out.allowedActions.push("transfer-turn-lead", "resend-data");
+    if (controlled.some((t) => t.phase === "IN_GAME" && t.stage === "TURN")) out.allowedActions.push("transfer-turn-lead");
+    if (controlled.some((t) => t.phase === "IN_GAME" && ["TURN", "ENSEMBLE_SHARE"].includes(t.stage ?? ""))) out.allowedActions.push("resend-data");
+    // The GM remote operates the viewer's own game. A different team's open
+    // gate must not enable the head GM's closed/locked game controls.
+    if (gm) for (const team of controlled.filter((t) => t.key === out.team?.key && t.phase === "IN_GAME" && t.stage === "TURN" && !t.paused)) {
+      const game = s.games.find((g) => g.id === team.gameId)!;
+      const count = s.cards.filter((c) => c.game_id === game.id).length;
+      const config = settings(game.config_snapshot);
+      if (game.gm_guess_open) out.allowedActions.push("close-guess");
+      else if (!game.guess_locked && count >= (game.game_no === 1 ? config.guessEnableAfter.game1 : config.guessEnableAfter.others)) out.allowedActions.push("open-guess");
+    }
     if (controlled.some((t) => !t.paused && t.stage === "ENSEMBLE_SHARE")) out.allowedActions.push("ensemble-shared");
     if (controlled.some((t) => !t.paused && t.stage === "ENSEMBLE_DISCUSS")) out.allowedActions.push("ensemble-end-discussion");
     if (controlled.some((t) => t.phase === "IN_GAME" && !t.paused)) out.allowedActions.push("pause");

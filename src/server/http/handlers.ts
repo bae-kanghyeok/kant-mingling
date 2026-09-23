@@ -23,16 +23,16 @@ export function apiHandler(action:string) {
     try {
       if(action==="state") {
         const slug=slugSchema.parse(new URL(request.url).searchParams.get("slug"));
-        const tokenHash=getRequestTokenHash(request); if(!tokenHash) reject(401,"UNAUTHENTICATED");
+        const tokenHash=getRequestTokenHash(request,slug); if(!tokenHash) reject(401,"UNAUTHENTICATED");
         return json(await getState(slug,tokenHash));
       }
       const body=await readJson(request);
       const slug=slugSchema.parse(body.slug);
-      const tokenHash=getRequestTokenHash(request);
+      const tokenHash=getRequestTokenHash(request,slug);
       if(action==="bootstrap") {
         const ip=process.env.VERCEL==="1"?(request.headers.get("x-vercel-forwarded-for")??request.headers.get("x-forwarded-for")??"unknown"):"local";
         const session=await bootstrapSession({slug,tokenHash,ipHash:hashSessionToken(`ip:${ip.split(",")[0].trim()}`)});
-        return json({ok:true},200,session.token?{"Set-Cookie":sessionCookieHeader(session.token,session.maxAgeSeconds)}:undefined);
+        return json({ok:true},200,session.token?{"Set-Cookie":sessionCookieHeader(session.token,session.maxAgeSeconds,slug)}:undefined);
       }
       if(!tokenHash) reject(401,"UNAUTHENTICATED");
       const receipt=!(["profile","sync","ensemble-vote","intro-ack"].includes(action));

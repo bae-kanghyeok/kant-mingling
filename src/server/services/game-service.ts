@@ -13,7 +13,7 @@ import { selectReceiver, type CardDelivery } from '../game/receiver';
 import { afterCardPublished, getEnsembleTrigger, tallyEnsembleVotes } from '../game/ensemble';
 import { advanceGroundTruth, type GroundTruthState } from '../game/ground-truth';
 import { evaluateGuess } from '../game/guess';
-import { DEFAULT_TEAM_SETTINGS, parseTeamSettings, type TeamSettings } from '../game/settings';
+import { DEFAULT_TEAM_SETTINGS, parseTeamSettings, isGmMode, gmGameSettings, MAX_EVENT_ROUND, type TeamSettings } from '../game/settings';
 import { GameRuleError, type DataCard, type GameMember, type GamePhase, type GuessAttempt, type Option } from '../game/types';
 
 interface TeamBlockRow {
@@ -24,6 +24,7 @@ interface GameRow {
   id: string; event_id: string; team_id: string; team_block_id: string; block_no: number; game_no: number;
   config_snapshot: TeamSettings; owner_participant_id: string; noise_slots: number[]; rng_seed: string;
   phase: GamePhase; turn_lead_participant_id: string | null; guess_locked: boolean; exhausted: boolean;
+  gm_guess_open: boolean;
   ensemble_trigger_no: number | null; ensemble_sharer_id: string | null; ensemble_done: boolean;
   vote_deadline: Date | null; gt_status: GroundTruthState['status']; gt_real_cards_needed: number;
   game_version: number;
@@ -176,7 +177,7 @@ async function appendCard(ctx: TxContext, loaded: LoadedGame): Promise<void> {
       INSERT INTO card_deliveries(card_id,participant_id,reason,delivered_at)
       SELECT card.id,p,'initial',$7::timestamptz FROM card CROSS JOIN unnest($8::uuid[]) p
     ), updated AS (
-      UPDATE games SET turn_lead_participant_id=$9,guess_locked=false,exhausted=$10,phase=$11,
+      UPDATE games SET turn_lead_participant_id=$9,guess_locked=false,gm_guess_open=false,exhausted=$10,phase=$11,
         ensemble_sharer_id=CASE WHEN $11='ENSEMBLE_SHARE' THEN $9 ELSE ensemble_sharer_id END,
         game_version=game_version+1 WHERE id=$1
     ) SELECT * FROM card`, [game.id, card.cardNo, card.questionId, card.displayedOption, card.trueOption, card.isNoise,
@@ -185,6 +186,7 @@ async function appendCard(ctx: TxContext, loaded: LoadedGame): Promise<void> {
   loaded.cardRows.push(row);
   game.turn_lead_participant_id = receiver.turnLeadId;
   game.guess_locked = false;
+  game.gm_guess_open = false;
   game.exhausted = cardNo === 20;
   game.phase = transition.phase;
   game.game_version++;
@@ -194,16 +196,21 @@ async function appendCard(ctx: TxContext, loaded: LoadedGame): Promise<void> {
 
 /** Caller authorizes the admin operation; outer runCommand owns the transaction. */
 export async function createGame(ctx: TxContext, { teamBlockId, gameNo }: { teamBlockId: string; gameNo: number }): Promise<string> {
+  const gm = isGmMode(ctx.event.config_json);
+  if (gm && ctx.event.rotation_requested) reject(409, 'ROTATION_PENDING');
   const block = (await ctx.client.query<TeamBlockRow & { previous_owner_ids: string[] }>(`SELECT tb.*,t.operator_participant_id,
     ARRAY(SELECT g.owner_participant_id FROM games g WHERE g.team_id=tb.team_id AND g.block_no=tb.block_no AND g.event_id=$2) AS previous_owner_ids
     FROM team_blocks tb JOIN teams t ON t.id=tb.team_id
     WHERE tb.id=$1 AND tb.event_id=$2 FOR UPDATE OF tb`, [teamBlockId, ctx.event.id])).rows[0];
   if (!block) reject(404, 'NOT_FOUND');
-  if (!Number.isInteger(gameNo) || gameNo < 1 || gameNo > 9 || Math.ceil(gameNo / 3) !== block.block_no) reject(422, 'INVALID_REQUEST');
+  if (!Number.isInteger(gameNo) || gameNo < 1 || gameNo > (gm ? MAX_EVENT_ROUND : 9) || (!gm && Math.ceil(gameNo / 3) !== block.block_no)) reject(422, 'INVALID_REQUEST');
   if (block.paused_at) reject(409, 'PAUSED');
   if (block.current_game_id) {
     const current = (await ctx.client.query<{ game_no: number; phase: string }>('SELECT game_no,phase FROM games WHERE id=$1 FOR UPDATE', [block.current_game_id])).rows[0];
-    if (!current || current.phase !== 'REVEALED' || current.game_no % 3 === 0 || gameNo !== current.game_no + 1) reject(409, 'WRONG_PHASE');
+    if (!current || current.phase !== 'REVEALED' || (!gm && current.game_no % 3 === 0) || gameNo !== current.game_no + 1) reject(409, 'WRONG_PHASE');
+  } else if (gm) {
+    const previous = (await ctx.client.query<{ last: number }>('SELECT COALESCE(max(game_no),0)::integer AS last FROM games WHERE team_id=$1', [block.team_id])).rows[0].last;
+    if (gameNo !== previous + 1) reject(409, 'WRONG_PHASE');
   } else if (gameNo !== (block.block_no - 1) * 3 + 1) reject(409, 'WRONG_PHASE');
   const rows = (await ctx.client.query<MemberRow>(`SELECT p.id,p.role,p.roster_order,p.profile_completed_at,p.owner_count,
     COALESCE((SELECT jsonb_object_agg(a.question_id,a.option) FROM profile_answers a WHERE a.participant_id=p.id AND a.event_id=$2),'{}'::jsonb) answers,
@@ -212,9 +219,13 @@ export async function createGame(ctx: TxContext, { teamBlockId, gameNo }: { team
     WHERE a.team_id=$1 AND a.event_id=$2 AND a.block_no=$3 AND p.event_id=$2
       AND p.active=true AND p.attendance <> 'absent' AND p.profile_completed_at IS NOT NULL
     ORDER BY p.roster_order FOR UPDATE OF p`, [block.team_id, ctx.event.id, block.block_no, ctx.now])).rows;
+  // The GM's player DTO supplies the personal remote's game and version. Starting
+  // without that participating GM would leave the team unable to use its remote.
+  if (gm && !rows.some(member => member.id === block.operator_participant_id)) reject(409, 'GM_NOT_READY');
   if (rows.length < 2) reject(409, 'INSUFFICIENT_MEMBERS');
   const members = rows.map(mapMember);
-  const settings = parseTeamSettings(Object.keys((block.settings_json ?? {}) as object).length ? block.settings_json : DEFAULT_TEAM_SETTINGS);
+  const baseSettings = parseTeamSettings(Object.keys((block.settings_json ?? {}) as object).length ? block.settings_json : DEFAULT_TEAM_SETTINGS);
+  const settings = gm ? gmGameSettings(baseSettings, gameNo) : baseSettings;
   const seed = randomBytes(16).toString('hex');
   let owner;
   try { owner = selectOwner({ members, previousOwnerIdsInBlock: block.previous_owner_ids, rng: makeRng(seed, 'owner') }); }
@@ -224,8 +235,9 @@ export async function createGame(ctx: TxContext, { teamBlockId, gameNo }: { team
   const trigger = getEnsembleTrigger({ gameNo, memberCount: members.length, settings });
   const game = (await ctx.client.query<GameRow>(`WITH created AS (
     INSERT INTO games(event_id,team_id,team_block_id,block_no,game_no,config_snapshot,
-    owner_participant_id,noise_slots,rng_seed,phase,ensemble_trigger_no,started_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'TURN',$10,$11) RETURNING *
+    owner_participant_id,noise_slots,rng_seed,phase,ensemble_trigger_no,started_at,game_version)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'TURN',$10,$11,
+      CASE WHEN $13::boolean THEN (SELECT COALESCE(max(game_version),-1)+1 FROM games WHERE team_id=$2) ELSE 0 END) RETURNING *
     ), members_added AS (
       INSERT INTO game_members(game_id,participant_id) SELECT created.id,p FROM created CROSS JOIN unnest($12::uuid[]) p
     ), profiles_locked AS (
@@ -235,7 +247,7 @@ export async function createGame(ctx: TxContext, { teamBlockId, gameNo }: { team
       UPDATE team_blocks SET current_game_id=created.id,phase='IN_GAME',team_version=team_version+1,
         started_at=COALESCE(team_blocks.started_at,$11::timestamptz),done_at=NULL FROM created WHERE team_blocks.id=$3
     ) SELECT * FROM created`,
-  [ctx.event.id, block.team_id, block.id, block.block_no, gameNo, JSON.stringify(settings), owner.ownerId, slots, seed, trigger, ctx.now, members.map((member) => member.id)])).rows[0];
+  [ctx.event.id, block.team_id, block.id, block.block_no, gameNo, JSON.stringify(settings), owner.ownerId, slots, seed, trigger, ctx.now, members.map((member) => member.id), gm])).rows[0];
   await appendCard(ctx, { game, teamBlock: block, members, cards: [], cardRows: [], deliveryRows: [],
     groundTruthCardNos: [], attempts: [], votes: [], viewerGroundTruthSeen: false, viewerNoiseSeen: false });
   return game.id;
@@ -251,12 +263,12 @@ async function revealLoadedGame(ctx: TxContext, loaded: LoadedGame, reason: 'cor
   if (loaded.game.phase === 'REVEALED') return;
   const gameId = loaded.game.id;
   const pauseMs = loaded.teamBlock.paused_at ? Math.max(0, ctx.now.getTime() - loaded.teamBlock.paused_at.getTime()) : 0;
-  await ctx.client.query(`WITH revealed AS (UPDATE games SET phase='REVEALED',revealed_at=$2,end_reason=$3,guess_locked=false,
+  await ctx.client.query(`WITH revealed AS (UPDATE games SET phase='REVEALED',revealed_at=$2,end_reason=$3,guess_locked=false,gm_guess_open=false,
     gt_status=CASE WHEN gt_status='pending' THEN 'skipped' ELSE gt_status END,
     vote_deadline=NULL,vote_remaining_ms=NULL,paused_ms_total=paused_ms_total+$4,game_version=game_version+1 WHERE id=$1)
     UPDATE team_blocks SET phase=$6,team_version=team_version+1,paused_at=NULL,
     done_at=CASE WHEN $6='BLOCK_DONE' THEN $2::timestamptz ELSE NULL END WHERE id=$5 AND current_game_id=$1`,
-  [gameId, ctx.now, reason, pauseMs, loaded.teamBlock.id, loaded.game.game_no % 3 === 0 ? 'BLOCK_DONE' : 'REVEAL']);
+  [gameId, ctx.now, reason, pauseMs, loaded.teamBlock.id, !isGmMode(ctx.event.config_json) && loaded.game.game_no % 3 === 0 ? 'BLOCK_DONE' : 'REVEAL']);
 }
 
 async function acknowledgeIntro(ctx: TxContext, args: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -305,6 +317,17 @@ async function dispatchGameCommand(ctx: TxContext, command: string, args: Record
   const participantId = ctx.session.participant_id;
   if (!participantId) reject(401, 'UNAUTHENTICATED');
   const canDelegate = isOperatorForGame(ctx, loaded);
+  const gm = isGmMode(ctx.event.config_json);
+  if (command === 'next-card') {
+    if (!gm || !canDelegate) reject(403, 'FORBIDDEN');
+    if (game.phase !== 'TURN') reject(409, 'WRONG_PHASE');
+    const extra = parse(z.object({ expectedCardCount: z.number().int().min(1).max(20) }), args);
+    if (extra.expectedCardCount !== cards.length) reject(409, 'STALE_VERSION');
+    // A GM controls pacing without gaining access to another recipient's private card.
+    await appendCard(ctx, loaded);
+    return {};
+  }
+  if (gm && command === 'more-data') reject(403, 'FORBIDDEN');
   if (command === 'more-data' || command === 'guess') {
     requireMember(ctx, loaded);
     if (game.turn_lead_participant_id !== participantId) reject(409, 'NOT_TURN_LEAD');
@@ -318,6 +341,7 @@ async function dispatchGameCommand(ctx: TxContext, command: string, args: Record
     return {};
   }
   if (command === 'guess') {
+    if (gm && !game.gm_guess_open) reject(409, 'GM_GUESS_CLOSED');
     const extra = parse(z.object({ ownerPick: z.string().uuid(), noisePicks: z.array(z.number().int().min(1).max(20)).max(5) }), args);
     const result = evaluateGuess({ gameNo: game.game_no, settings: parseTeamSettings(game.config_snapshot), phase: game.phase,
       paused: false, guessLocked: game.guess_locked, cards, memberIds: members.map((member) => member.id), ownerId: game.owner_participant_id,
@@ -326,10 +350,11 @@ async function dispatchGameCommand(ctx: TxContext, command: string, args: Record
       SELECT $1,COALESCE(max(attempt_no),0)+1,$2,$3,$4,$5,$6,$7 FROM guess_attempts WHERE game_id=$1`,
     [game.id, participantId, extra.ownerPick, extra.noisePicks, cards.length, result.correct, ctx.now]);
     if (result.correct) await revealLoadedGame(ctx, loaded, 'correct');
-    else await ctx.client.query('UPDATE games SET guess_locked=$2,game_version=game_version+1 WHERE id=$1', [game.id, result.guessLocked]);
+    else await ctx.client.query('UPDATE games SET guess_locked=$2,gm_guess_open=false,game_version=game_version+1 WHERE id=$1', [game.id, result.guessLocked]);
     return { correct: result.correct };
   }
   if (command === 'ensemble-shared') {
+    if (gm && !canDelegate) reject(403, 'FORBIDDEN');
     if (!canDelegate && participantId !== game.ensemble_sharer_id) reject(403, 'FORBIDDEN');
     if (game.phase !== 'ENSEMBLE_SHARE') reject(409, 'WRONG_PHASE');
     await ctx.client.query(`UPDATE games SET phase='ENSEMBLE_VOTE',vote_deadline=$2,vote_remaining_ms=NULL,game_version=game_version+1 WHERE id=$1`, [game.id, new Date(ctx.now.getTime() + 30_000)]);
@@ -359,9 +384,10 @@ async function dispatchGameCommand(ctx: TxContext, command: string, args: Record
     return { revision };
   }
   if (command === 'ensemble-end-discussion') {
+    if (gm && !canDelegate) reject(403, 'FORBIDDEN');
     if (!canDelegate && participantId !== game.ensemble_sharer_id) reject(403, 'FORBIDDEN');
     if (game.phase !== 'ENSEMBLE_DISCUSS') reject(409, 'WRONG_PHASE');
-    await ctx.client.query(`UPDATE games SET phase='TURN',ensemble_done=true,turn_lead_participant_id=ensemble_sharer_id,game_version=game_version+1 WHERE id=$1`, [game.id]);
+    await ctx.client.query(`UPDATE games SET phase='TURN',ensemble_done=true,gm_guess_open=false,turn_lead_participant_id=ensemble_sharer_id,game_version=game_version+1 WHERE id=$1`, [game.id]);
     game.phase = 'TURN';
     game.ensemble_done = true;
     game.turn_lead_participant_id = game.ensemble_sharer_id;

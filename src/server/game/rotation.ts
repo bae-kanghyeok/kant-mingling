@@ -8,7 +8,7 @@ export interface RotationGroup { memberIds: string[]; kind: 'stayed' | 'moved'; 
 export interface RotationInput {
   assignments: readonly TeamAssignment[];
   moveCountPerTeam: number;
-  nextBlockNo: 2 | 3;
+  nextBlockNo: number;
   pairHistory: readonly PairHistory[];
   previousGroups?: readonly RotationGroup[];
   operatorHistory?: Readonly<Record<string, readonly string[]>>;
@@ -55,6 +55,7 @@ function distributeMovers(movers: readonly { id: string; source: string | null }
 
 export function planRotation(input: RotationInput): RotationResult {
   const { assignments, rng, moveCountPerTeam } = input;
+  if (!Number.isInteger(input.nextBlockNo) || input.nextBlockNo < 2 || input.nextBlockNo > 32767) throw new GameRuleError('INVALID_BLOCK');
   if (!Number.isInteger(moveCountPerTeam) || moveCountPerTeam < 0) throw new GameRuleError('INVALID_MOVE_COUNT');
   if (new Set(assignments.map((assignment) => assignment.participantId)).size !== assignments.length) throw new GameRuleError('DUPLICATE_PARTICIPANT');
   const currentStudents = assignments.filter((assignment) => assignment.role === 'student');
@@ -135,7 +136,7 @@ export function planRotation(input: RotationInput): RotationResult {
       for (const group of [stayed, incoming]) repeatedTriples += tripleKeys(group).filter((key) => oldTriples.has(key)).length;
       for (const source of currentTeams) sameSourceIncomingTriples += chooseThree(incoming.filter((id) => sourceById.get(id) === source).length);
       for (let a = 0; a < ids.length - 1; a++) for (let b = a + 1; b < ids.length; b++) repeatedPairs += pairs.get(pairKey(ids[a], ids[b])) ?? 0;
-      if (input.nextBlockNo === 3) for (const id of ids) {
+      if (input.nextBlockNo >= 3) for (const id of ids) {
         const history = input.operatorHistory?.[id];
         if (history && history.length >= 2 && history.slice(-2).every((operatorId) => operatorId === team.operatorId)) sameOperatorThreeBlocks++;
       }

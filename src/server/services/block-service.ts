@@ -5,7 +5,7 @@ import { reject } from "../http/respond";
 import { makeRng } from "../game/rng";
 import { createInitialAssignments } from "../game/teams";
 import { planRotation, type RotationGroup } from "../game/rotation";
-import { DEFAULT_TEAM_SETTINGS, validateRosterConfig, getStudentCapacities, getTeamKeys, type GlobalConfig } from "../game/settings";
+import { DEFAULT_TEAM_SETTINGS, validateRosterConfig, getStudentCapacities, getTeamKeys, isGmMode, MAX_EVENT_ROUND, type GlobalConfig } from "../game/settings";
 import { GameRuleError, type RosterEntry, type TeamAssignment } from "../game/types";
 import { ZodError } from "zod";
 import { operationLog } from "./shared";
@@ -71,7 +71,7 @@ export async function publishSetupDraft(ctx: TxContext) {
   await ctx.client.query("UPDATE events SET teams_published_at=$2,draft_assignments=NULL,session_version=session_version+1 WHERE id=$1",[ctx.event.id,ctx.now]);
 }
 export async function calculateNextPlan(ctx: TxContext): Promise<BlockPlan> {
-  if(ctx.event.current_block<1 || ctx.event.current_block>=3) reject(409,"WRONG_PHASE");
+  if(ctx.event.current_block<1 || ctx.event.current_block>=(isGmMode(ctx.event.config_json)?MAX_EVENT_ROUND:3)) reject(409,"WRONG_PHASE");
   const roster=await effectiveNextRoster(ctx);
   const config=validateRosterConfig(ctx.event.pending_config_json ?? ctx.event.config_json,roster,ctx.event.host_participant_id ?? undefined);
   const initial=createInitialAssignments({config,roster,rng:rng("target-teams")});
@@ -81,7 +81,8 @@ export async function calculateNextPlan(ctx: TxContext): Promise<BlockPlan> {
   const targetTeams=getTeamKeys(config.teamCount).map((teamKey,i)=>({teamKey,
     operatorId:initial.find(a=>a.teamKey===teamKey&&a.role==="operator")!.participantId,studentCapacity:capacities[i]}));
   const operatorHistory:Record<string,string[]>={};
-  for(let b=1;b<=ctx.event.current_block;b++) {
+  // Only the last two rounds affect the three-consecutive-GM penalty.
+  for(let b=Math.max(1,ctx.event.current_block-1);b<=ctx.event.current_block;b++) {
     const previous=await readAssignments(ctx,b);
     for(const student of previous.filter(a=>a.role==="student")) {
       const op=previous.find(a=>a.teamKey===student.teamKey&&a.role==="operator");
@@ -89,15 +90,15 @@ export async function calculateNextPlan(ctx: TxContext): Promise<BlockPlan> {
     }
   }
   let previousGroups:RotationGroup[]=[];
-  if(ctx.event.current_block===2) {
-    const first=await readAssignments(ctx,1);
-    previousGroups=getTeamKeys(ctx.event.config_json.teamCount).flatMap(teamKey=>{
+  if(ctx.event.current_block>=2) {
+    const first=await readAssignments(ctx,ctx.event.current_block-1);
+    previousGroups=[...new Set(first.map(a=>a.teamKey))].flatMap(teamKey=>{
       const original=first.filter(a=>a.teamKey===teamKey&&a.role==="student");
       return (["stayed","moved"] as const).map(kind=>({teamKey,kind,memberIds:original.filter(a=>
         (current.find(c=>c.participantId===a.participantId)?.teamKey===teamKey)===(kind==="stayed")).map(a=>a.participantId)}));
     });
   }
-  const result=planRotation({assignments:current,moveCountPerTeam:config.moveCountPerTeam,nextBlockNo:(ctx.event.current_block+1) as 2|3,
+  const result=planRotation({assignments:current,moveCountPerTeam:config.moveCountPerTeam,nextBlockNo:ctx.event.current_block+1,
     pairHistory:pairs,previousGroups,operatorHistory,targetTeams,activeStudentIds:roster.filter(p=>p.active!==false&&p.role==="student").map(p=>p.id),rng:rng("rotation")});
   const plan={assignments:result.assignments,groups:result.groups};
   await ctx.client.query("UPDATE events SET next_block_plan=$2 WHERE id=$1",[ctx.event.id,JSON.stringify(plan)]);
@@ -105,9 +106,12 @@ export async function calculateNextPlan(ctx: TxContext): Promise<BlockPlan> {
 }
 export async function settleBlocks(ctx: TxContext) {
   if(ctx.event.phase!=="BLOCK") return;
-  const blocks=(await ctx.client.query<{phase:string}>("SELECT phase FROM team_blocks WHERE event_id=$1 AND block_no=$2",[ctx.event.id,ctx.event.current_block])).rows;
+  const gm=isGmMode(ctx.event.config_json);
+  if(gm&&!ctx.event.rotation_requested) return;
+  const blocks=(await ctx.client.query<{phase:string;rotation_ready:boolean}>("SELECT phase,rotation_ready FROM team_blocks WHERE event_id=$1 AND block_no=$2",[ctx.event.id,ctx.event.current_block])).rows;
   if(!blocks.length || blocks.some(b=>b.phase!=="BLOCK_DONE")) return;
-  if(ctx.event.current_block===3) return; // Host closes after the final Behind the Data conversation.
+  if(gm&&blocks.some(b=>!b.rotation_ready)) return;
+  if(!gm&&ctx.event.current_block===3) return; // Host closes after the final Behind the Data conversation.
   const assignments=await readAssignments(ctx,ctx.event.current_block);
   const pairs: Array<{a:string;b:string}>=[];
   for(const key of [...new Set(assignments.map(a=>a.teamKey))]) {
@@ -135,16 +139,18 @@ export async function refreshNextPlan(ctx:TxContext) {
   }
 }
 export async function publishNextBlock(ctx: TxContext) {
-  if(ctx.event.phase!=="BREAK" || ctx.event.current_block>=3) reject(409,"WRONG_PHASE");
+  if(ctx.event.phase!=="BREAK" || ctx.event.current_block>=(isGmMode(ctx.event.config_json)?MAX_EVENT_ROUND:3)) reject(409,"WRONG_PHASE");
   const plan=ctx.event.next_block_plan as BlockPlan|null;
   if(!plan?.assignments?.length) reject(409,"WRONG_PHASE");
   await applyPending(ctx);
   const block=ctx.event.current_block+1;
   await writeAssignments(ctx,block,plan.assignments);
-  await ctx.client.query(`INSERT INTO team_blocks(event_id,block_no,team_id,phase,settings_json)
-    SELECT DISTINCT $1::uuid,$2::smallint,t.id,'SEATING',t.settings_json FROM teams t JOIN block_assignments ba ON ba.team_id=t.id
-    WHERE ba.event_id=$1 AND ba.block_no=$2`,[ctx.event.id,block]);
-  await ctx.client.query("UPDATE events SET phase='BLOCK',current_block=$2,next_block_plan=NULL,session_version=session_version+1 WHERE id=$1",[ctx.event.id,block]);
+  await ctx.client.query(`INSERT INTO team_blocks(event_id,block_no,team_id,phase,settings_json,team_version)
+    SELECT DISTINCT $1::uuid,$2::smallint,t.id,'SEATING',t.settings_json,
+      CASE WHEN $3::boolean THEN (SELECT COALESCE(max(tb.team_version),-1)+1 FROM team_blocks tb WHERE tb.team_id=t.id) ELSE 0 END
+    FROM teams t JOIN block_assignments ba ON ba.team_id=t.id
+    WHERE ba.event_id=$1 AND ba.block_no=$2`,[ctx.event.id,block,isGmMode(ctx.event.config_json)]);
+  await ctx.client.query("UPDATE events SET phase='BLOCK',current_block=$2,next_block_plan=NULL,rotation_requested=false,session_version=session_version+1 WHERE id=$1",[ctx.event.id,block]);
 }
 export async function createFirstTeamBlocks(ctx: TxContext) {
   if(ctx.event.phase!=="SETUP" || !ctx.event.teams_published_at) reject(409,"WRONG_PHASE");
@@ -157,6 +163,8 @@ export async function createFirstTeamBlocks(ctx: TxContext) {
   return (await ctx.client.query<{id:string}>("SELECT id FROM team_blocks WHERE event_id=$1 AND block_no=1 ORDER BY team_id",[ctx.event.id])).rows;
 }
 export async function saveGlobalDraft(ctx: TxContext, settings: GlobalConfig) {
+  // Gameplay semantics cannot change beneath active games or historical snapshots.
+  if(ctx.event.phase!=="SETUP"&&isGmMode(settings)!==isGmMode(ctx.event.config_json)) reject(422,"INVALID_REQUEST");
   validateRosterConfig(settings,await effectiveNextRoster(ctx),ctx.event.host_participant_id ?? undefined);
   await ctx.client.query("UPDATE events SET pending_config_json=$2,draft_assignments=NULL,next_block_plan=NULL,session_version=session_version+1 WHERE id=$1",[ctx.event.id,JSON.stringify(settings)]);
   ctx.event.pending_config_json=settings;

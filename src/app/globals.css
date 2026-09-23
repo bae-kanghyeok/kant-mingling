@@ -95,6 +95,20 @@ label { display: block; font-size: .9rem; font-weight: 550; }
 .loading-dots i:nth-child(3) { animation-delay: .4s; }
 @keyframes breathing { 50% { opacity: .2; transform: translateY(-3px); } }
 .tutorial { max-width: 520px; margin: 0 auto; }
+.tutorial-actions { position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 max(8px, env(safe-area-inset-bottom)); z-index: 1; }
+.gm-remote { border: 1px solid var(--line-soft); border-radius: 20px; padding: 20px; margin-bottom: 22px; background: var(--surface); }
+.gm-remote h2 { margin: 14px 0 10px; font-size: 21px; }
+.gm-remote h3 { margin: 14px 0; font-size: 17px; }
+.gm-remote .eyebrow { margin: 0; color: var(--accent); }
+.gm-remote > .muted { font-size: 13px; margin-bottom: 18px; }
+.gm-remote .button { min-height: 48px; white-space: normal; }
+.gm-secondary { margin-top: 14px; }
+.gm-secondary .button { width: 100%; }
+.gm-next-game label { min-width: 0; }
+.gm-next-game select { width: 100%; }
+.gm-next-game > .small { margin: 12px 0; }
+.conversation-notice p { font-size: 13px; margin: 8px 0 0; }
+@media (max-width: 480px) { .gm-remote { padding: 16px; } .gm-next-game .field-row { grid-template-columns: 1fr; } }
 .tutorial-progress { display: flex; gap: 6px; }
 .tutorial-progress span { height: 3px; flex: 1; background: var(--line-soft); }
 .tutorial-progress .active { background: var(--brand); }

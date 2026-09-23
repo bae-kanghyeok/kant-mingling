@@ -13,12 +13,14 @@ export interface SnapshotGame {
   id: string; team_id: string; team_block_id: string; block_no: number; game_no: number; config_snapshot: TeamSettings;
   owner_participant_id: string; rng_seed: string; phase: GamePhase; turn_lead_participant_id: string | null;
   guess_locked: boolean; exhausted: boolean; ensemble_trigger_no: number | null; ensemble_sharer_id: string | null;
+  gm_guess_open?: boolean;
   ensemble_done: boolean; vote_deadline: string | null; vote_remaining_ms: number | null; game_version: number; paused_ms_total: number;
   started_at: string; revealed_at: string | null; end_reason: "correct" | "forced" | "session_end" | null;
 }
 export interface SnapshotBlock {
   id: string; team_id: string; block_no: number; phase: TeamPhase; current_game_id: string | null;
   team_version: number; settings_json: TeamSettings; paused_at: string | null; started_at: string | null;
+  rotation_ready?: boolean;
 }
 export interface SnapshotCard {
   id: string; game_id: string; card_no: number; question_id: string; displayed_option: "A" | "B"; true_option: "A" | "B"; is_noise: boolean;
@@ -28,7 +30,7 @@ export interface EventSnapshot {
   event: { id: string; slug: string; title: string; phase: "SETUP" | "BLOCK" | "BREAK" | "ENDED"; current_block: number;
     host_participant_id: string | null; config_json: GlobalConfig; session_version: number; teams_published_at: string | null;
     pending_config_json: GlobalConfig | null; pending_roster_json: RosterEntry[] | null; draft_assignments: TeamAssignment[] | null;
-    next_block_plan: { assignments: TeamAssignment[] } | null };
+    next_block_plan: { assignments: TeamAssignment[] } | null; rotation_requested?: boolean };
   session: { id: string; participant_id: string | null; last_seen_at: string } | null;
   people: SnapshotPerson[];
   sessions: { participant_id: string | null; last_seen_at: string; expires_at: string; revoked_at: string | null }[];
@@ -70,7 +72,9 @@ const snapshotSql = `SELECT jsonb_build_object(
   'groundTruths',COALESCE((SELECT jsonb_agg(to_jsonb(t)) FROM ground_truths t JOIN games g ON g.id=t.game_id WHERE g.event_id=e.id),'[]'::jsonb),
   'intros',COALESCE((SELECT jsonb_agg(to_jsonb(i)) FROM intro_seen i JOIN participants p ON p.id=i.participant_id WHERE p.event_id=e.id),'[]'::jsonb),
   'overlays',COALESCE((SELECT jsonb_agg(to_jsonb(o)) FROM game_overlay_seen o JOIN games g ON g.id=o.game_id WHERE g.event_id=e.id),'[]'::jsonb),
-  'logs',COALESCE((SELECT jsonb_agg(to_jsonb(l)) FROM (SELECT actor_participant_id,command,target,created_at FROM operation_logs WHERE event_id=e.id ORDER BY created_at DESC,id DESC LIMIT 30) l),'[]'::jsonb)
+  'logs',COALESCE((SELECT jsonb_agg(to_jsonb(l)) FROM (SELECT actor_participant_id,command,target,created_at FROM operation_logs
+    WHERE event_id=e.id AND command NOT IN ('COMMON_CARD_FALLBACK','RARE_CARD_FALLBACK','owner_fallback')
+    ORDER BY created_at DESC,id DESC LIMIT 30) l),'[]'::jsonb)
 ) AS snapshot FROM events e WHERE e.slug=$1`;
 
 export async function loadStateSnapshot(slug: string, tokenHash: string): Promise<EventSnapshot> {

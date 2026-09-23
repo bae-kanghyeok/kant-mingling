@@ -17,9 +17,9 @@ export function RuleOverlay({ game, groundTruthIntroSeen, send, busy }: { game: 
   const errorNotice = error && <p role="alert" className="error-message">{error}</p>;
   if (overlay.kind === "noise") return <Modal title="잠깐, Noise가 숨어 있습니다">
     <div className="rule-symbol" aria-hidden="true">≠</div><h3>지금까지 본 Data가 전부 진짜는 아닙니다.</h3>
-    <p>현재 공개된 Data {overlay.cardCount ?? game.cards.length}개 중 Noise {overlay.noiseCount ?? 1}개가 숨어 있습니다.</p>
+    <p>{game.gm ? "Noise 확인! 어떤 단서가 Noise일까요? 지금까지의 선택과 이유를 함께 이야기해보세요." : `현재 공개된 Data ${overlay.cardCount ?? game.cards.length}개 중 Noise ${overlay.noiseCount ?? 1}개가 숨어 있습니다.`}</p>
     <p className="muted">Data Owner와 함께 어떤 Data가 Noise인지도 찾아보세요.</p>
-    {errorNotice}<button className="button primary full" disabled={busy} onClick={acknowledge}>추리 시작하기</button>
+    {errorNotice}<button className="button primary full" disabled={busy} onClick={acknowledge}>{game.gm ? "확인했어요" : "추리 시작하기"}</button>
   </Modal>;
   if (overlay.kind === "ensemble") return <Modal title="잠깐, Ensemble이 시작됩니다">
     <div className="rule-symbol" aria-hidden="true">⋈</div><h3>이번에는 이야기하기 전에 각자 먼저 생각해볼 시간입니다.</h3>

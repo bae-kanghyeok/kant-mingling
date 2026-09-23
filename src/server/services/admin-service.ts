@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { TxContext } from "../db/tx";
 import { reject } from "../http/respond";
-import { parseGlobalConfig, parseTeamSettings, applyPreset, DEFAULT_TEAM_SETTINGS } from "../game/settings";
+import { parseGlobalConfig, parseTeamSettings, applyPreset, DEFAULT_TEAM_SETTINGS, DEFAULT_GM_SETTINGS, isGmMode, MAX_EVENT_ROUND } from "../game/settings";
 import { swapAssignmentSeats } from "../game/teams";
 import type { RosterEntry, TeamAssignment } from "../game/types";
 import { createGame, forceReveal } from "./game-service";
@@ -13,9 +13,10 @@ import { createSetupDraft, publishSetupDraft, createFirstTeamBlocks, publishNext
 
 const uuid=z.uuid();
 const hostCommands=new Set(["assign-teams","publish-teams","start-game1","publish-next-block","end-session","transfer-host",
-  "update-global-settings","swap-seats","upsert-participant","remove-participant"]);
+  "update-global-settings","swap-seats","upsert-participant","remove-participant","request-rotation","cancel-rotation"]);
 export const adminCommands=[...hostCommands,"unlock-participant","mark-attendance","next-game","start-block-game","pause","resume",
-  "force-end-game","transfer-turn-lead","resend-data","update-team-settings","apply-preset"];
+  "force-end-game","transfer-turn-lead","resend-data","update-team-settings","apply-preset",
+  "gm-next-game","open-guess","close-guess","rotation-ready"];
 
 async function targetParticipant(ctx:TxContext,id:string) {
   const target=(await ctx.client.query<{id:string;profile_locked_at:Date|null;role:string}>(
@@ -30,7 +31,7 @@ async function targetParticipant(ctx:TxContext,id:string) {
   return target;
 }
 async function rosterChange(ctx:TxContext,command:string,args:Record<string,unknown>) {
-  if(ctx.event.current_block===3) reject(409,"WRONG_PHASE");
+  if(!isGmMode(ctx.event.config_json)&&ctx.event.current_block===3) reject(409,"WRONG_PHASE");
   let roster=await effectiveNextRoster(ctx);
   let targetId:string;
   if(command==="remove-participant") {
@@ -88,6 +89,7 @@ async function rosterChange(ctx:TxContext,command:string,args:Record<string,unkn
 
 export async function executeAdminCommand(ctx:TxContext,input:{command:string;teamKey?:string;expectedVersion?:number;args?:Record<string,unknown>}) {
   const {command,teamKey}=input; const args=input.args??{};
+  const gm=isGmMode(ctx.event.config_json);
   if(!adminCommands.includes(command)) reject(422,"INVALID_REQUEST");
   if(ctx.session.role!=="operator") reject(403,"FORBIDDEN");
   if(ctx.event.phase==="ENDED") reject(410,"ENDED");
@@ -103,6 +105,19 @@ export async function executeAdminCommand(ctx:TxContext,input:{command:string;te
       for(const block of blocks) await createGame(ctx,{teamBlockId:block.id,gameNo:1});
     }
     else if(command==="publish-next-block") await publishNextBlock(ctx);
+    else if(command==="request-rotation") {
+      if(!gm||ctx.event.phase!=="BLOCK"||ctx.event.rotation_requested||ctx.event.current_block>=MAX_EVENT_ROUND) reject(409,"WRONG_PHASE");
+      await ctx.client.query("UPDATE events SET rotation_requested=true,session_version=session_version+1 WHERE id=$1",[ctx.event.id]);
+      ctx.event.rotation_requested=true;
+    }
+    else if(command==="cancel-rotation") {
+      if(!gm||ctx.event.phase!=="BLOCK"||!ctx.event.rotation_requested) reject(409,"WRONG_PHASE");
+      await ctx.client.query(`UPDATE team_blocks SET rotation_ready=false,
+        phase=CASE WHEN phase='BLOCK_DONE' THEN CASE WHEN current_game_id IS NULL THEN 'SEATING' ELSE 'REVEAL' END ELSE phase END,
+        done_at=NULL,team_version=team_version+1 WHERE event_id=$1 AND block_no=$2`,[ctx.event.id,ctx.event.current_block]);
+      await ctx.client.query("UPDATE events SET rotation_requested=false,session_version=session_version+1 WHERE id=$1",[ctx.event.id]);
+      ctx.event.rotation_requested=false;
+    }
     else if(command==="update-global-settings") await saveGlobalDraft(ctx,parseGlobalConfig(args.settings));
     else if(command==="swap-seats") {
       const a=uuid.parse(args.a),b=uuid.parse(args.b);
@@ -124,7 +139,7 @@ export async function executeAdminCommand(ctx:TxContext,input:{command:string;te
     }
     else if(command==="end-session") {
       if(args.confirm!==true) reject(422,"CONFIRM_REQUIRED");
-      if(ctx.event.current_block!==3&&(args.emergency!==true||args.confirmEmergency!==true)) reject(409,"WRONG_PHASE");
+      if(!gm&&ctx.event.current_block!==3&&(args.emergency!==true||args.confirmEmergency!==true)) reject(409,"WRONG_PHASE");
       const active=(await ctx.client.query<{id:string}>("SELECT id FROM games WHERE event_id=$1 AND phase<>'REVEALED' ORDER BY team_id",[ctx.event.id])).rows;
       for(const game of active) await forceReveal(ctx,game.id,"session_end");
       await ctx.client.query("UPDATE events SET phase='ENDED',ended_at=$2,session_version=session_version+1 WHERE id=$1",[ctx.event.id,ctx.now]);
@@ -160,22 +175,51 @@ export async function executeAdminCommand(ctx:TxContext,input:{command:string;te
     await operationLog(ctx,command,teamKey); return {};
   }
   const block=await currentTeamBlock(ctx,team.id);
-  if(command==="next-game"||command==="start-block-game") {
+  if(command==="rotation-ready") {
     checkVersion(block.team_version,input.expectedVersion);
+    if(!gm||ctx.event.phase!=="BLOCK"||!ctx.event.rotation_requested||!["REVEAL","SEATING"].includes(block.phase)) reject(409,"WRONG_PHASE");
+    if(block.current_game_id && !(await ctx.client.query("SELECT 1 FROM games WHERE id=$1 AND phase='REVEALED'",[block.current_game_id])).rowCount) reject(409,"WRONG_PHASE");
+    await ctx.client.query("UPDATE team_blocks SET rotation_ready=true,phase='BLOCK_DONE',done_at=$2,team_version=team_version+1 WHERE id=$1",[block.id,ctx.now]);
+  } else if(command==="next-game"||command==="gm-next-game"||command==="start-block-game") {
+    checkVersion(block.team_version,input.expectedVersion);
+    if(ctx.event.phase!=="BLOCK") reject(409,"WRONG_PHASE");
+    if(command==="gm-next-game"&&!gm) reject(409,"WRONG_PHASE");
+    if(gm&&command==="next-game") reject(409,"WRONG_PHASE");
+    if(gm&&ctx.event.rotation_requested) reject(409,"ROTATION_PENDING");
     if(block.paused_at) reject(409,"PAUSED");
     let gameNo=(ctx.event.current_block-1)*3+1;
-    if(command==="next-game") {
+    if(command==="next-game"||command==="gm-next-game") {
       if(block.phase!=="REVEAL"||!block.current_game_id) reject(409,"WRONG_PHASE");
       gameNo=(await ctx.client.query<{game_no:number}>("SELECT game_no FROM games WHERE id=$1",[block.current_game_id])).rows[0].game_no+1;
-      if((gameNo-1)%3===0) reject(409,"WRONG_PHASE");
+      if(!gm&&(gameNo-1)%3===0) reject(409,"WRONG_PHASE");
     } else if(block.phase!=="SEATING") reject(409,"WRONG_PHASE");
+    if(gm) {
+      if(command==="start-block-game") gameNo=(await ctx.client.query<{last:number}>("SELECT COALESCE(max(game_no),0)::integer AS last FROM games WHERE team_id=$1",[team.id])).rows[0].last+1;
+      const config=z.object({noiseCap:z.number().int().min(0).max(5).optional(),groundTruth:z.boolean().optional()}).parse(args);
+      const base=parseTeamSettings(Object.keys(block.settings_json??{}).length?block.settings_json:DEFAULT_TEAM_SETTINGS);
+      const settings=parseTeamSettings({...base,gm:{...(base.gm??DEFAULT_GM_SETTINGS),...config}});
+      await ctx.client.query("UPDATE teams SET settings_json=$2 WHERE id=$1",[team.id,JSON.stringify(settings)]);
+      await ctx.client.query("UPDATE team_blocks SET settings_json=$2 WHERE id=$1",[block.id,JSON.stringify(settings)]);
+    }
     await createGame(ctx,{teamBlockId:block.id,gameNo});
   } else {
     if(block.phase!=="IN_GAME"||!block.current_game_id) reject(409,"WRONG_PHASE");
-    const game=(await ctx.client.query<{id:string;phase:string;game_version:number;vote_deadline:Date|null;vote_remaining_ms:number|null}>("SELECT id,phase,game_version,vote_deadline,vote_remaining_ms FROM games WHERE id=$1 FOR UPDATE",[block.current_game_id])).rows[0];
-    if(command==="transfer-turn-lead"||command==="resend-data") {
+    const game=(await ctx.client.query<{id:string;phase:string;game_no:number;game_version:number;vote_deadline:Date|null;vote_remaining_ms:number|null;guess_locked:boolean;exhausted:boolean;config_snapshot:unknown}>("SELECT * FROM games WHERE id=$1 FOR UPDATE",[block.current_game_id])).rows[0];
+    if(command==="open-guess"||command==="close-guess") {
+      checkVersion(game.game_version,input.expectedVersion);
+      if(!gm||game.phase!=="TURN") reject(409,"WRONG_PHASE");
+      if(block.paused_at) reject(409,"PAUSED");
+      if(command==="open-guess") {
+        if(game.guess_locked&&!game.exhausted) reject(409,"GUESS_LOCKED");
+        const count=(await ctx.client.query<{count:number}>("SELECT count(*)::integer AS count FROM data_cards WHERE game_id=$1",[game.id])).rows[0].count;
+        const settings=parseTeamSettings(game.config_snapshot);
+        if(count<(game.game_no===1?settings.guessEnableAfter.game1:settings.guessEnableAfter.others)) reject(409,"NOT_ENOUGH_DATA");
+      }
+      await ctx.client.query("UPDATE games SET gm_guess_open=$2,game_version=game_version+1 WHERE id=$1",[game.id,command==="open-guess"]);
+    } else if(command==="transfer-turn-lead"||command==="resend-data") {
       checkVersion(game.game_version,input.expectedVersion);
       if(!["TURN","ENSEMBLE_SHARE"].includes(game.phase)) reject(409,"WRONG_PHASE");
+      if(command==="transfer-turn-lead"&&game.phase!=="TURN") reject(409,"WRONG_PHASE");
       const participantId=uuid.parse(args.participantId);
       if(!(await ctx.client.query("SELECT 1 FROM game_members WHERE game_id=$1 AND participant_id=$2",[game.id,participantId])).rowCount) reject(422,"INVALID_REQUEST");
       if(command==="resend-data") {
@@ -186,7 +230,7 @@ export async function executeAdminCommand(ctx:TxContext,input:{command:string;te
         await ctx.client.query("INSERT INTO card_deliveries(card_id,participant_id,reason) VALUES($1,$2,'resend')",[card.id,participantId]);
         if(game.phase==="ENSEMBLE_SHARE") await ctx.client.query("UPDATE games SET ensemble_sharer_id=$2 WHERE id=$1",[game.id,participantId]);
       }
-      await ctx.client.query("UPDATE games SET turn_lead_participant_id=$2,game_version=game_version+1 WHERE id=$1",[game.id,participantId]);
+      await ctx.client.query("UPDATE games SET turn_lead_participant_id=$2,gm_guess_open=false,game_version=game_version+1 WHERE id=$1",[game.id,participantId]);
     } else {
       checkVersion(block.team_version,input.expectedVersion);
       if(command==="force-end-game") await forceReveal(ctx,game.id,"forced");

@@ -4,7 +4,7 @@ import { GET, POST } from "@/app/api/rehearsal/route";
 import { apiHandler } from "@/server/http/handlers";
 import { getState } from "@/server/dto/state-dto";
 import { getPool, closePool } from "@/server/db/pool";
-import { hashSessionToken } from "@/server/auth/session";
+import { hashSessionToken, sessionCookieName } from "@/server/auth/session";
 import { DEFAULT_GLOBAL_CONFIG, DEFAULT_TEAM_SETTINGS } from "@/server/game/settings";
 import { SYNTHETIC_REHEARSAL_CONFIG } from "@/server/rehearsal/reset-fixture.mjs";
 import { cleanupTestEvent, createTestEvent, createTestSession, type TestEvent } from "./helpers";
@@ -50,14 +50,14 @@ it("authenticates only the real host code; switches normal role permissions and 
   expect(Object.keys(initial).sort()).toEqual(["canEnable", "enabled", "eventPhase", "expiresAt", "hostParticipantId", "ok", "roster", "selectedParticipantId"].sort());
   expect((await command({ action: "switch", participantId: randomUUID() })).status).toBe(404);
   await command({ action: "switch", participantId: event.students[0] });
-  const studentToken = cookies.get("km_session")!;
+  const studentToken = cookies.get(sessionCookieName(event.slug))!;
   const student = await getState(event.slug, hashSessionToken(studentToken));
   expect(student.me).toMatchObject({ participantId: event.students[0], role: "student", isHost: false }); expect(student.admin).toBeUndefined();
   const adminResponse = await apiHandler("admin")(request({ command: "assign-teams", expectedVersion: student.versions.session, requestId: randomUUID() }));
   expect(adminResponse.status).toBe(403);
   await command({ action: "switch", participantId: event.operators[0] });
   await expect(getState(event.slug, hashSessionToken(studentToken))).rejects.toMatchObject({ status: 401 });
-  expect((await getState(event.slug, hashSessionToken(cookies.get("km_session")!))).me?.isHost).toBe(true);
+  expect((await getState(event.slug, hashSessionToken(cookies.get(sessionCookieName(event.slug))!))).me?.isHost).toBe(true);
 });
 
 it("restarts only the authorized fixture and preserves identity, codes and the supervisor while clearing game progress", async () => {
@@ -68,7 +68,7 @@ it("restarts only the authorized fixture and preserves identity, codes and the s
     const unrelatedBefore = await getPool().query("SELECT row_to_json(e)::text AS snapshot FROM events e WHERE id=$1", [unrelated.id]);
     const peopleBefore = (await getPool().query("SELECT id,operator_code_hash FROM participants WHERE event_id=$1 ORDER BY roster_order", [event.id])).rows;
     await enable();
-    const originalHostToken = cookies.get("km_session")!;
+    const originalHostToken = cookies.get(sessionCookieName(event.slug))!;
     expect((await command({ action: "reset" })).status).toBe(422);
     const prepared = await command({ action: "reset", confirm: "RESET" });
     expect(prepared.status).toBe(200);
@@ -86,12 +86,12 @@ it("restarts only the authorized fixture and preserves identity, codes and the s
       WHERE g.event_id=$1 AND t.team_key='A' AND g.game_no=1`, [event.id])).rows[0];
     expect(focusBody.selectedParticipantId).toBe(turn.turn_lead_participant_id);
     await command({ action: "switch", participantId: event.students[0] });
-    const oldStudentToken = cookies.get("km_session")!;
+    const oldStudentToken = cookies.get(sessionCookieName(event.slug))!;
     await getPool().query("INSERT INTO intro_seen(participant_id,intro_key) VALUES($1,'tutorial') ON CONFLICT DO NOTHING", [event.students[0]]);
     await getPool().query(`INSERT INTO ground_truths(game_id,card_id) SELECT game_id,id FROM data_cards WHERE game_id=$1 LIMIT 1`, [gameIds[0].id]);
     const reset = await command({ action: "reset", confirm: "RESET" });
     expect(reset.status).toBe(200); expect(await reset.json()).toMatchObject({ eventPhase: "SETUP", selectedParticipantId: event.operators[0] });
-    expect(cookies.get("km_session") === originalHostToken).toBe(true);
+    expect(cookies.get(sessionCookieName(event.slug)) === originalHostToken).toBe(true);
     expect((await GET(request())).status).toBe(200);
     await expect(getState(event.slug, hashSessionToken(oldStudentToken))).rejects.toMatchObject({ status: 401 });
     const summary = (await getPool().query(`SELECT
@@ -136,10 +136,10 @@ it("rechecks host authority and synthetic identity and does not grant cross-orig
 });
 
 it("can reauthenticate from a claimed student cookie and disable both current-role and supervisor access", async () => {
-  const student = await createTestSession(event, event.students[0]); cookies.set("km_session", student.token);
+  const student = await createTestSession(event, event.students[0]); cookies.set(sessionCookieName(event.slug), student.token);
   await enable();
   await command({ action: "switch", participantId: event.students[1] });
-  const selectedToken = cookies.get("km_session")!; const supervisor = cookies.get("km_rehearsal")!;
+  const selectedToken = cookies.get(sessionCookieName(event.slug))!; const supervisor = cookies.get("km_rehearsal")!;
   const stopped = await command({ action: "disable" }); expect(stopped.status).toBe(200); expect(cookies.size).toBe(0);
   await expect(getState(event.slug, hashSessionToken(selectedToken))).rejects.toMatchObject({ status: 401 });
   cookies.set("km_rehearsal", supervisor);
@@ -153,7 +153,7 @@ it("assists only other members of the selected team, through real Ensemble and G
     FROM participants p CROSS JOIN generate_series(1,20) q WHERE p.event_id=$1`, [event.id]);
   await getPool().query("UPDATE participants SET profile_completed_at=clock_timestamp() WHERE event_id=$1", [event.id]);
   async function admin(name: string) {
-    const current = await getState(event.slug, hashSessionToken(cookies.get("km_session")!));
+    const current = await getState(event.slug, hashSessionToken(cookies.get(sessionCookieName(event.slug))!));
     const response = await apiHandler("admin")(request({ command: name, expectedVersion: current.versions.session, requestId: randomUUID() }));
     expect(response.status).toBe(200);
   }

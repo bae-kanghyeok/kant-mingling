@@ -72,7 +72,7 @@ async function validateGrant(context: Context, request: Request) {
   return { grant, host };
 }
 async function selectedParticipant(context: Context, request: Request) {
-  const hash = getRequestTokenHash(request);
+  const hash = getRequestTokenHash(request, context.event.slug);
   if (!hash) return null;
   return (await context.client.query<{ participant_id: string }>(`SELECT participant_id FROM sessions
     WHERE event_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at>$3`,
@@ -89,7 +89,7 @@ export async function rehearsalState(request: Request, slug: string) {
   return transaction(slug, async context => {
     const supervisor = await validateGrant(context, request);
     const selected = await selectedParticipant(context, request);
-    const host = await validHostSession(context, getRequestTokenHash(request));
+    const host = await validHostSession(context, getRequestTokenHash(request, context.event.slug));
     return state(context, selected, !!supervisor, !!host, supervisor?.grant.expiresAt ?? null);
   });
 }
@@ -111,7 +111,7 @@ async function enable(request: Request, slug: string, code: string) {
     const host = await validHostSession(context, hashSessionToken(token));
     if (!host) reject(401, "UNAUTHENTICATED");
     await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND token_hash=$2 AND id<>$4 AND revoked_at IS NULL",
-      [context.event.id, getRequestTokenHash(request), context.now, host.id]);
+      [context.event.id, getRequestTokenHash(request, context.event.slug), context.now, host.id]);
     return enabledResponse(context, host, token);
   });
 }
@@ -124,7 +124,7 @@ function enabledResponse(context: Context, host: HostSession, token: string) {
   const maxAge = (expiresAt - context.now.getTime()) / 1000;
   const headers = new Headers();
   headers.append("Set-Cookie", supervisorCookieHeader(signSupervisorGrant(grant), maxAge));
-  headers.append("Set-Cookie", sessionCookieHeader(token, maxAge));
+  headers.append("Set-Cookie", sessionCookieHeader(token, maxAge, context.event.slug));
   return json(state(context, grant.hostParticipantId, true, true, expiresAt), 200, headers);
 }
 
@@ -141,7 +141,7 @@ async function enableEnded(request: Request, slug: string, code: string, ipHash:
     if (!person || !await verifyOperatorCode(code, person.operator_code_hash)) reject(401, "BAD_CODE", true);
     const token = createSessionToken();
     await client.query(`UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND revoked_at IS NULL
-      AND (participant_id=$2 OR token_hash=$4)`, [event.id, event.host_participant_id, now, getRequestTokenHash(request)]);
+      AND (participant_id=$2 OR token_hash=$4)`, [event.id, event.host_participant_id, now, getRequestTokenHash(request, context.event.slug)]);
     await client.query("INSERT INTO sessions(event_id,participant_id,token_hash,expires_at) VALUES($1,$2,$3,$4)",
       [event.id, event.host_participant_id, hashSessionToken(token), new Date(now.getTime() + SUPERVISOR_MAX_AGE_SECONDS * 1000)]);
     const host = await validHostSession(context, hashSessionToken(token));
@@ -155,7 +155,7 @@ async function switchParticipant(context: Context, request: Request, host: HostS
   if (!person) reject(404, "NOT_FOUND");
   // Only the original host session survives a role change.
   await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND token_hash=$2 AND id<>$4 AND revoked_at IS NULL",
-    [context.event.id, getRequestTokenHash(request), context.now, host.id]);
+    [context.event.id, getRequestTokenHash(request, context.event.slug), context.now, host.id]);
   let token = grant.hostToken;
   if (person.id !== grant.hostParticipantId) {
     token = createSessionToken();
@@ -164,7 +164,7 @@ async function switchParticipant(context: Context, request: Request, host: HostS
       [context.event.id, person.id, hashSessionToken(token), new Date(grant.expiresAt)]);
   }
   return json(state(context, person.id, true, person.id === grant.hostParticipantId, grant.expiresAt), 200,
-    { "Set-Cookie": sessionCookieHeader(token, (grant.expiresAt - context.now.getTime()) / 1000) });
+    { "Set-Cookie": sessionCookieHeader(token, (grant.expiresAt - context.now.getTime()) / 1000, context.event.slug) });
 }
 
 async function quickStart(context: Context, host: HostSession) {
@@ -244,9 +244,9 @@ export async function rehearsalCommand(request: Request, input: unknown) {
     const selected = await selectedParticipant(context, request);
     if (command.action === "disable") {
       await context.client.query("UPDATE sessions SET revoked_at=$3 WHERE event_id=$1 AND revoked_at IS NULL AND (id=$2 OR token_hash=$4)",
-        [context.event.id, host.id, context.now, getRequestTokenHash(request)]);
+        [context.event.id, host.id, context.now, getRequestTokenHash(request, context.event.slug)]);
       const headers = new Headers();
-      headers.append("Set-Cookie", supervisorCookieHeader("", 0)); headers.append("Set-Cookie", clearSessionCookieHeader());
+      headers.append("Set-Cookie", supervisorCookieHeader("", 0)); headers.append("Set-Cookie", clearSessionCookieHeader(context.event.slug));
       return json(state(context, null, false, false, null), 200, headers);
     }
     if (command.action === "switch") {

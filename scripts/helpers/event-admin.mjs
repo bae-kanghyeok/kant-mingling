@@ -8,6 +8,7 @@ export const rosterSchema = z.object({
   students: z.array(name).min(2),
   operators: z.array(z.object({ name, team: z.string().regex(/^[A-Z]$/) }).strict()).min(1).max(26),
   host: name,
+  gameplayMode: z.enum(["classic", "gm"]).optional(),
   moveCountPerTeam: z.number().int().min(0).default(3),
   blockTargetMinutes: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]).default([12, 12, 15]),
 }).strict().superRefine((roster, ctx) => {

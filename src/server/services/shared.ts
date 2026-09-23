@@ -4,7 +4,7 @@ import { reject } from "../http/respond";
 import type { TeamSettings } from "../game/settings";
 export interface TeamRow { id: string; event_id: string; team_key: string; operator_participant_id: string|null; settings_json: TeamSettings }
 export interface TeamBlockRow { id: string; event_id: string; team_id: string; block_no: number; phase: string;
-  current_game_id: string|null; team_version: number; settings_json: TeamSettings; paused_at: Date|null; started_at: Date|null; done_at: Date|null }
+  current_game_id: string|null; team_version: number; settings_json: TeamSettings; paused_at: Date|null; started_at: Date|null; done_at: Date|null; rotation_ready?: boolean }
 export function requireHost(ctx: TxContext) {
   if (ctx.session.role !== "operator" || ctx.event.host_participant_id !== ctx.session.participant_id) reject(403, "FORBIDDEN");
 }

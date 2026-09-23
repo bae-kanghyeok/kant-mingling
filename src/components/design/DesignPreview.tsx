@@ -14,8 +14,8 @@ import { createPreviewState, isAdminPreview, previewGroups, previewGuessCards, p
 import styles from "./DesignPreview.module.css";
 
 export default function DesignPreview({ embedded = false }: { embedded?: boolean }) {
-  const [view, setView] = useState<PreviewView>("entry");
-  const [state, setState] = useState<PublicState>(() => createPreviewState("entry"));
+  const [view, setView] = useState<PreviewView>("gm-talk");
+  const [state, setState] = useState<PublicState>(() => createPreviewState("gm-talk"));
   const [revision, setRevision] = useState(0);
   const [adminOpen, setAdminOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -62,12 +62,18 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
       setState((current) => ({ ...current, game: { ...current.game!, ensemble: { ...current.game!.ensemble!, myVote: String(body?.pickId), myRevision: (current.game!.ensemble!.myRevision ?? 0) + 1 } } }));
       setNotice("선택을 표시했어요. ‘다음 화면’을 누르면 합성 투표 결과를 볼 수 있어요.");
     } else if (path === "/api/game/ensemble-end-discussion") navigate("ground-truth");
+    else if (path === "/api/game/next-card") setNotice("다음 단서 전달 버튼을 확인했어요. 실제 단서 배정은 실제 게임에서 실행됩니다.");
     else if (path === "/api/game/more-data") navigate(view === "wrong" ? "turn-lead" : "noise");
     else if (path === "/api/game/guess") {
       navigate("wrong"); setNotice("오답일 때의 동작 예시예요. 실제 정답 판정은 하지 않았어요. 정답 공개는 목록에서 바로 볼 수 있어요.");
     } else if (path === "/api/admin") {
       const command = String(body?.command ?? "");
-      if (command === "assign-teams") {
+      if (command === "open-guess" || command === "close-guess") {
+        setState((current) => ({ ...current, game: { ...current.game!, gm: { guessOpen: command === "open-guess" } }, allowedActions: current.allowedActions.filter((action) => action !== "open-guess" && action !== "close-guess").concat(command === "open-guess" ? "close-guess" : "open-guess") }));
+      } else if (command === "request-rotation") navigate("gm-rotation");
+      else if (command === "cancel-rotation") navigate("gm-reveal");
+      else if (command === "gm-next-game") navigate("gm-remote");
+      else if (command === "assign-teams") {
         const prepared = createPreviewState("admin").admin!;
         setState((current) => ({ ...current, admin: { ...current.admin!, nextBlockPlan: prepared.teams.map((team) => ({ teamKey: team.key, members: team.members.map((person) => person.displayName) })) }, allowedActions: [...current.allowedActions, "publish-teams", "swap-seats"] }));
       } else if (command === "publish-teams") {
@@ -85,7 +91,7 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
   };
 
   const adminTab = view === "admin-people" ? "people" : view === "admin-settings" ? "settings" : view === "admin-logs" ? "logs" : "progress";
-  const entryStep = view === "tutorial" ? "tutorial" : view === "names" || view === "operator" ? "names" : "welcome";
+  const entryStep = view === "tutorial" || view === "gm-tutorial" ? "tutorial" : view === "names" || view === "operator" ? "names" : "welcome";
   let content;
   if (!state.me) content = <Entry key={`${view}:${revision}`} state={state} send={send} busy={false} initialStep={entryStep} initialOperatorId={view === "operator" ? "design-operator-A" : undefined} />;
   else if (view === "profile") content = <><p className={styles.profileNote}>이 화면 안에서만 선택을 저장해요. 실제 프로필은 만들지 않습니다.</p><Profile key={revision} state={state} slug="design-preview-only" send={send} persistence={persistence} /></>;
@@ -98,7 +104,7 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
 
   return <div className={embedded ? styles.embedded : undefined}>
     <section className={styles.tools} aria-label="화면 둘러보기">
-      <div className={styles.toolsHeading}><div><h1>모든 화면 둘러보기</h1><p>등록부터 게임·자리 이동·관제까지 원하는 장면으로 바로 이동하세요.</p></div><span className={styles.safeBadge}>합성 데이터 · DB 저장 없음</span></div>
+      <div className={styles.toolsHeading}><div><h1>모든 화면 둘러보기</h1><p>상단 ‘GM 방식 · 최신’에서 새 진행을 확인하세요. 기존 등록·게임 화면도 비교할 수 있어요.</p></div><span className={styles.safeBadge}>합성 데이터 · DB 저장 없음</span></div>
       <div className={styles.stepper}>
         <button type="button" className="button secondary small" disabled={index === 0} onClick={() => navigate(previewScenarios[index - 1].key)}>← 이전 화면</button>
         <label className={styles.screenSelect}><span>{index + 1} / {previewScenarios.length} 화면</span><select aria-label="둘러볼 화면 선택" value={view} onChange={(event) => navigate(event.target.value as PreviewView)}>{previewGroups.map((group) => <optgroup key={group} label={group}>{previewScenarios.filter((item) => item.group === group).map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</optgroup>)}</select></label>
@@ -114,11 +120,11 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
     </section>
     <Shell className="app-shell" aria-label="선택한 화면 예시">
       <header className="app-header"><Brand />{state.me ? <div className="identity"><span>{state.team?.key && <b>{state.team.key}</b>}{state.me.displayName}</span>{state.admin && <button className="admin-trigger" onClick={() => setAdminOpen(true)}>관리자</button>}</div> : <span className="header-caption">Whose Data?</span>}</header>
-      {state.me && state.event.currentBlock > 0 && view !== "ended" && <nav className="game-context" aria-label="행사 진행 예시"><span>함께 알아가는 시간</span><ol>{[1, 2, 3].map((block) => <li key={block} aria-current={block === state.event.currentBlock ? "step" : undefined}><span>{block}</span><span>블록</span></li>)}</ol></nav>}
+      {state.me && state.event.currentBlock > 0 && view !== "ended" && <nav className="game-context" aria-label="행사 진행 예시"><span>함께 알아가는 시간</span>{state.event.gameplayMode === "gm" ? <span>현재 자리 · {state.event.currentBlock}회차</span> : <ol>{[1, 2, 3].map((block) => <li key={block} aria-current={block === state.event.currentBlock ? "step" : undefined}><span>{block}</span><span>블록</span></li>)}</ol>}</nav>}
       <div className="page-content">{content}</div>
       <footer className="app-footer">서로의 Data가, 새로운 대화가 되도록.</footer>
     </Shell>
     {adminOpen && state.admin && <AdminPanel key={`${view}:${revision}`} state={state} send={send} busy={false} onClose={() => setAdminOpen(false)} initialTab={adminTab} commandFeedback="화면 체험 완료 · 실제 DB에 저장하거나 게임을 변경하지 않았어요." />}
-    <aside className={styles.watermark}>화면 둘러보기 · 합성 데이터 · 실제 게임은 ‘실제 게임’에서 진행</aside>
+    <aside className={styles.watermark}>화면 둘러보기 · 합성 데이터 · 실제 참가는 별도 행사 링크에서 진행</aside>
   </div>;
 }

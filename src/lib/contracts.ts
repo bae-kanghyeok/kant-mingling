@@ -5,6 +5,7 @@ export type TeamPhase = "SEATING" | "IN_GAME" | "REVEAL" | "BLOCK_DONE";
 export type GamePhase = "TURN" | "ENSEMBLE_SHARE" | "ENSEMBLE_VOTE" | "ENSEMBLE_DISCUSS" | "REVEALED";
 export type CardQuestion = { category: string; options: { A: string; B: string } };
 export interface PublicGame {
+  gm?: { guessOpen: boolean };
   gameId: string; gameNo: number; phase: GamePhase;
   turnLead: Pick<Person,"participantId"|"displayName"> | null;
   candidates: Pick<Person,"participantId"|"displayName">[];
@@ -24,6 +25,7 @@ export interface PublicGame {
 export interface AdminView {
   isHost: boolean;
   teams: { key: string; operatorName: string; phase: string; paused: boolean; gameNo: number|null;
+    rotationReady?: boolean;
     revealedCount: number; stage: string|null; turnLeadName: string|null;
     members: (Person & { online: boolean; profileComplete: boolean; attendance: string })[];
     timers: { gameElapsedMs: number|null; blockElapsedMs: number|null; blockTargetMs: number };
@@ -36,7 +38,8 @@ export interface AdminView {
 export interface PublicState {
   serverNow: string; poll: { intervalMs: number; needsSync: boolean };
   versions: { session: number; team?: number; game?: number };
-  event: { slug: string; title: string; phase: "SETUP"|"BLOCK"|"BREAK"|"ENDED"; currentBlock: number; teamCount?: number };
+  event: { slug: string; title: string; phase: "SETUP"|"BLOCK"|"BREAK"|"ENDED"; currentBlock: number; teamCount?: number;
+    gameplayMode?: "classic"|"gm"; rotationRequested?: boolean };
   me: (Person & { isHost: boolean; profileComplete: boolean; introsSeen: IntroKey[] })|null;
   roster?: (Person & { locked: boolean })[];
   profile?: { answers: Partial<Record<string,"A"|"B">>; revisions: Partial<Record<string,number>>; complete: boolean; editable: boolean };

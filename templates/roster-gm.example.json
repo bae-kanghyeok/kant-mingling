@@ -1,0 +1,9 @@
+{
+  "title": "KANT Mingling · GM과 함께하는 취향 탐정",
+  "gameplayMode": "gm",
+  "students": ["학생01", "학생02", "학생03", "학생04", "학생05"],
+  "operators": [{ "name": "운영진A", "team": "A" }],
+  "host": "운영진A",
+  "moveCountPerTeam": 0,
+  "blockTargetMinutes": [12, 12, 15]
+}

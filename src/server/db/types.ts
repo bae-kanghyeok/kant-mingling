@@ -8,6 +8,7 @@ export interface EventRow {
   content_version: string; session_version: number; teams_published_at: Date | null;
   next_block_plan: unknown; started_at: Date | null; ended_at: Date | null;
   pending_config_json: GlobalConfig | null; pending_roster_json: unknown; draft_assignments: unknown;
+  rotation_requested?: boolean;
 }
 export interface SessionRow {
   id: string; event_id: string; participant_id: string | null; expires_at: Date; revoked_at: Date | null;
