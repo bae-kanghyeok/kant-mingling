@@ -8,6 +8,7 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 
 ## 설치와 배포
 
+- **집의 새 PC·새 Codex에서 기존 작업 이어가기:** [현재 상태와 인계 프롬프트](docs/home-codex-handoff.md) — `develop` clone, 개발 환경 연결, 남은 검증
 - **처음 설치하는 사람:** [설치·배포 안내](docs/install-human.md)
 - **AI 에이전트에게 맡길 때:** [에이전트 실행 지침](docs/install-agent.md), [AGENTS.md](AGENTS.md)
 - **게임과 코드 구조:** [기술 개요](docs/architecture.md)
@@ -20,12 +21,12 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 - **프로필 콘텐츠:** [20문항과 후속 대화 질문](docs/profile-questions.md)
 
 ```sh
-git clone https://github.com/bae-kanghyeok/kant-mingling.git
+git clone --branch develop https://github.com/bae-kanghyeok/kant-mingling.git
 cd kant-mingling
 npm ci
 ```
 
-이후 자신의 Neon 개발 DB와 환경변수를 설정해야 합니다. `templates/environment.example`을 참고하세요. 연결 정보를 저장소·이슈·채팅에 올리지 마세요. 기존 운영자의 Vercel/Neon 계정이나 실제 참가자 명단은 포함하지 않습니다.
+위 명령은 최신 GM 개발본을 받습니다. 기존 기준 버전을 설치하려면 브랜치를 `main`으로 지정하세요. 이후 자신의 Neon 개발 DB와 환경변수를 설정해야 합니다. `templates/environment.example`을 참고하세요. 연결 정보를 저장소·이슈·채팅에 올리지 마세요. 기존 운영자의 Vercel/Neon 계정이나 실제 참가자 명단은 포함하지 않습니다.
 
 ```sh
 npm run migrate

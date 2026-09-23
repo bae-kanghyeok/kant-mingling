@@ -1,6 +1,7 @@
 # KANT Mingling 작업 지침
 
 - 먼저 README, docs/architecture.md, docs/install-agent.md를 읽는다.
+- 새 PC나 새 대화에서 기존 작업을 인계받으면 docs/home-codex-handoff.md를 함께 읽는다. 최신 GM 작업은 develop에 있으며 기본 clone의 main과 구분한다.
 - main은 검증된 게임 기준 버전이다. UI·확장 작업은 develop 또는 그 하위 작업 브랜치에서 한다.
 - Next.js의 설치 버전 문서는 node_modules/next/dist/docs/에 있다. 관련 가이드를 읽고 변경한다.
 - `.env*`의 내용을 읽거나 출력하지 않는다. 스크립트가 런타임에 로드하는 것은 허용한다. 키·쿠키·운영진 코드·실제 명단·프로필 답변을 로그나 커밋에 남기지 않는다.
