@@ -26,6 +26,8 @@ GM 모드의 첫 판은 각 조의 행사 전체 첫 판이며, 자리 이동 �
 
 `start-game1`은 총괄이 전 조 첫 판을 함께 시작한다. 정답 공개 뒤에는 각 조 GM이 `gm-next-game`을 실행하며 `noiseCap`·`groundTruth`를 함께 전달할 수 있다. 새 자리의 `SEATING` 상태에서는 `start-block-game`으로 해당 조를 시작한다. 두 시작 명령 모두 서버에서 새 판 설정을 고정한다.
 
+GM 모드에서는 판을 만들 때 담당 GM이 해당 판의 참여 조건을 만족하는지 확인한다. GM의 프로필 미완료·결석 등으로 참가 명단에 없으면 `GM_NOT_READY`로 거절한다. 학생만으로 게임을 시작한 뒤 리모컨을 사용할 사람이 없어지는 상태를 방지한다.
+
 게임 명령 `next-card`, `ensemble-shared`, `ensemble-end-discussion`은 현재 게임 버전을 확인한다. 추리 허가는 관리자 명령 `open-guess`/`close-guess`로 제어하며 실제 `guess`는 현재 Turn Lead의 참가자 명령이다. `allowedActions`는 UI용 허용 목록이며 서버의 역할·상태 검증을 대신하지 않는다. 해당 조 운영진 또는 총괄만 조를 제어할 수 있다.
 
 이동은 다음 상태 흐름을 따른다.

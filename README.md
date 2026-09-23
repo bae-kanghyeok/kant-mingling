@@ -2,7 +2,7 @@
 
 서로의 취향을 단서로 같은 조의 Data Owner를 찾는 행사 웹앱입니다. QR 입장, 이름 선택, A/B 프로필 20문항, 독립적인 조별 게임, 운영진 관제와 자리 이동을 지원합니다.
 
-`develop`에서는 **GM 모드**를 추가하고 있습니다. 조 운영진이 대화 뒤 다음 단서·추리를 열고, 판 수와 자리 이동 시점을 조절합니다. `gameplayMode: "gm"`으로 만든 새 행사에 적용되며, 기존 행사는 classic 방식으로 유지됩니다. 현재 검증·배포 상태는 [GM 운영 안내](docs/gm-mode.md#9-구현검증-기록)를 확인하세요.
+`develop`에 **GM 모드**를 구현하고 Preview에서 4인 원격 진행을 확인했습니다. 조 운영진이 대화 뒤 다음 단서·추리를 열고, 판 수와 자리 이동 시점을 조절합니다. `gameplayMode: "gm"`으로 만든 새 행사에 적용되며, 기존 행사는 classic 방식으로 유지됩니다. 검증 수단과 한계는 [GM 검증 기록](docs/gm-validation-2026-09-23.md)을 확인하세요.
 
 Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었습니다. Node.js **24.x**와 npm을 사용합니다.
 
