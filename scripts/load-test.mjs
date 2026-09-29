@@ -122,7 +122,7 @@ async function createFixture() {
   await client.query("BEGIN");
   try {
     await client.query("INSERT INTO events(id,slug,title,config_json,content_version) VALUES($1,$2,$3,$4,$5)",
-      [id, slug, "KANT Mingle · 합성 부하 검증", JSON.stringify(config), "2026-09-29.1"]);
+      [id, slug, "KANT Mingle · 합성 부하 검증", JSON.stringify(config), "2026-09-30.1"]);
     for (const actor of actors) {
       await client.query(`INSERT INTO participants(id,event_id,display_name,role,roster_order,attendance,profile_completed_at)
         VALUES($1,$2,$3,$4,$5,'present',now())`, [actor.id, id, actor.name, actor.role, actor.order]);

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_VERSION = '2026-09-29.1';
+const EXPECTED_VERSION = '2026-09-30.1';
 const QUESTION_IDS = Array.from(
   { length: 20 },
   (_, index) => `Q${String(index + 1).padStart(2, '0')}`,
@@ -67,7 +67,7 @@ export function validateCatalog(catalog, sourceMarkdown) {
   requireCondition(Array.isArray(catalog.questions), 'questions 배열이 필요합니다.');
   requireCondition(catalog.questions.length === QUESTION_IDS.length, '문항 수는 정확히 20개여야 합니다.');
 
-  // 2026-09-29 기준표는 분류(구분)를 쓰지 않는다: §2는 ID | A | B.
+  // 2026-09-30 기준표는 분류(구분)를 쓰지 않는다: §2는 ID | A | B.
   const questions = sourceRows(sourceMarkdown, 2, 3);
   const followUps = sourceRows(sourceMarkdown, 4, 2);
 

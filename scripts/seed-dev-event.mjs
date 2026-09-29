@@ -36,7 +36,7 @@ try {
   transactionOpen = true;
   await client.query("SET LOCAL statement_timeout = '8s'");
   const event = await client.query(`INSERT INTO events(slug, title, config_json, content_version)
-    VALUES ($1, $2, $3::jsonb, $4) RETURNING id`, [slug, "KANT Mingle · 개발 리허설", JSON.stringify(config), "2026-09-29.1"]);
+    VALUES ($1, $2, $3::jsonb, $4) RETURNING id`, [slug, "KANT Mingle · 개발 리허설", JSON.stringify(config), "2026-09-30.1"]);
   const eventId = event.rows[0].id;
   for (let number = 1; number <= 18; number += 1) {
     await client.query(`INSERT INTO participants(event_id, display_name, role, roster_order)
