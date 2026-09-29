@@ -29,11 +29,14 @@ afterAll(closePool);
 
 it("T25 every phase and role uses only permitted keys; Owner status changes no pre-reveal shape or actions", async () => {
   const fixture = await createVisibilityFixture(event);
-  const base = await loadStateSnapshot(event.slug, fixture.byPerson.get(event.students[4])!.tokenHash);
+  // A snapshot holds only the rows its own viewer's DTO reads, so each role gets its own.
+  const viewers = [event.students[1], event.students[4], event.students[2], event.operators[0], event.operators[1]];
+  const bases = new Map<string, EventSnapshot>();
+  for (const id of viewers) bases.set(id, await loadStateSnapshot(event.slug, fixture.byPerson.get(id)!.tokenHash));
+  const base = bases.get(event.students[4])!;
   for (const phase of ["TURN", "ENSEMBLE_SHARE", "ENSEMBLE_VOTE", "ENSEMBLE_DISCUSS", "REVEALED"] as GamePhase[]) {
-    for (const id of [event.students[1], event.students[4], event.students[2], event.operators[0], event.operators[1]]) {
-      const snapshot = structuredClone(base);
-      snapshot.session!.participant_id = id;
+    for (const id of viewers) {
+      const snapshot = structuredClone(bases.get(id)!);
       for (const game of snapshot.games) {
         game.phase = phase;
         if (phase === "ENSEMBLE_VOTE") game.vote_deadline = new Date(Date.now() + 30000).toISOString();
@@ -52,8 +55,7 @@ it("T25 every phase and role uses only permitted keys; Owner status changes no p
       expect(owner).toEqual(nonowner);
     }
   }
-  const lead = structuredClone(base);
-  lead.session!.participant_id = event.students[2];
+  const lead = structuredClone(bases.get(event.students[2])!);
   expect(checkDto(lead).game?.guess).not.toHaveProperty("noiseCount");
   lead.intros.push({ participant_id: event.students[2], intro_key: "noise" });
   expect(checkDto(lead).game?.guess?.noiseCount).toBe(1);

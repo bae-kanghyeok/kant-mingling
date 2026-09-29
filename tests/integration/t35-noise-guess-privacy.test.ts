@@ -34,9 +34,9 @@ it("T35 team wording is available only for an eligible Turn Lead's Noise review 
   for (const card of eligible.game!.guess!.cards!) expect(Object.keys(card).sort()).toEqual(["cardNo", "question", "text"]);
 
   for (const id of [event.students[4], event.operators[0], event.operators[1]]) {
-    const snapshot = structuredClone(base);
-    snapshot.session!.participant_id = id;
-    const state = buildPublicState(snapshot);
+    // A snapshot holds only the rows its own viewer's DTO reads, so load each viewer's.
+    const state = buildPublicState(await loadStateSnapshot(event.slug, fixture.byPerson.get(id)!.tokenHash));
+    expect(state.game, `non-lead role ${id}`).toBeDefined();
     expect(state.game?.guess?.cards, `non-lead role ${id}`).toBeUndefined();
     expect(state.game).not.toHaveProperty("reveal");
   }

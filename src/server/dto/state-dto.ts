@@ -10,6 +10,8 @@ import type { GameMember, TeamAssignment } from "../game/types";
 import { reject } from "../http/respond";
 
 const ms = (value: string | null | undefined) => value ? new Date(value).getTime() : null;
+// Phones left open after the session only need an occasional check.
+const ENDED_POLL_MS = 30000;
 const person = (p: SnapshotPerson): Person => ({ participantId: p.id, displayName: p.display_name, role: p.role });
 const named = (p: SnapshotPerson) => ({ participantId: p.id, displayName: p.display_name });
 const settings = (value: TeamSettings): TeamSettings => {
@@ -159,12 +161,12 @@ export function buildPublicState(s: EventSnapshot): PublicState {
   const isHost = me?.role === "operator" && me.id === s.event.host_participant_id;
   const gm = isGmMode(s.event.config_json);
   const gmEvent = gm ? { gameplayMode: "gm" as const, rotationRequested: !!s.event.rotation_requested } : {};
-  const intros = s.intros.filter((row) => row.participant_id === me?.id).map((row) => row.intro_key);
+  const intros = s.intros.filter((row) => row.participant_id === me?.id).map((row) => row.intro_key).sort();
   if (s.event.phase === "ENDED") {
     if (!me) reject(410, "ENDED");
     const previous = s.games.filter((g) => g.phase === "REVEALED" && s.members.some((m) => m.game_id === g.id && m.participant_id === me.id))
       .sort((a, b) => (ms(b.revealed_at) ?? 0) - (ms(a.revealed_at) ?? 0))[0];
-    return { serverNow: s.now, poll: { intervalMs: s.event.config_json.pollIdleMs, needsSync: false },
+    return { serverNow: s.now, poll: { intervalMs: Math.max(s.event.config_json.pollIdleMs, ENDED_POLL_MS), needsSync: false },
       versions: { session: s.event.session_version }, event: { slug: s.event.slug, title: s.event.title, phase: "ENDED", currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount, ...gmEvent },
       me: { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros }, allowedActions: [],
       ...(previous ? { lastReveal: gameDto(s, previous, me, intros) } : {}) };

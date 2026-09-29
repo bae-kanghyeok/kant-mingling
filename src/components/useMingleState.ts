@@ -82,7 +82,9 @@ export function useMingleState(slug: string) {
     };
     const wake = () => { if (!document.hidden && !stopped) void poll(); else clearTimeout(timer); };
     const warning = setInterval(() => {
-      if (!document.hidden && lastSuccess.current && Date.now() - lastSuccess.current > 8000) setDisconnected(true);
+      // Allow one missed poll at the server-chosen interval (30 s after the session ends).
+      const limit = Math.max(8000, (stateRef.current?.poll.intervalMs ?? 5000) + 6000);
+      if (!document.hidden && lastSuccess.current && Date.now() - lastSuccess.current > limit) setDisconnected(true);
     }, 1000);
     const start = async () => {
       lastSuccess.current = Date.now();
