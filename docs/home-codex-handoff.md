@@ -1,5 +1,7 @@
 # 집의 새 PC·새 Codex를 위한 KANT Mingling 인계
 
+> **2026-09-29 이후 과거 기록이다.** 최신 상태는 [2026-09-29 인계](codex-handoff-2026-09-29.md)를 따른다. 아래의 whos-data 운영·Preview 대상, "main에는 아직 합치지 않았다", `vercel link --project whos-data` 안내는 더 이상 쓰지 않는다. 현재 운영 대상은 `kant-mingling-live`이며 main과 develop은 같은 GM 버전이다.
+
 기준일: 2026-09-23. 이전 대화, 회사 PC, 비공개 첨부파일이 없어도 최신 소스를 받아 작업을 이어갈 수 있도록 작성했다. 상태와 검증 수치는 이 날짜의 기록이며, 집에서 접속할 때 Git과 서비스의 현재 상태를 다시 확인한다.
 
 **최신 GM 구현은 `develop`에 있다. GitHub 기본 브랜치 `main`에는 아직 합치지 않았다.** 저장소는 [bae-kanghyeok/kant-mingling](https://github.com/bae-kanghyeok/kant-mingling/tree/develop)이다. 제품 변경 기준 commit은 `7acb834`, 후속 검증 문서 기준은 `bc12d26`이다. 이 인계 문서를 포함한 이후 문서 commit도 함께 받는다.

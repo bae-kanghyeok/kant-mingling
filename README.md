@@ -8,7 +8,7 @@ Next.js 16 · React 19 · TypeScript · PostgreSQL/Neon · Vercel로 만들었�
 
 ## 설치와 배포
 
-- **집의 새 PC·새 Codex에서 기존 작업 이어가기:** [현재 상태와 인계 프롬프트](docs/home-codex-handoff.md) — `develop` clone, 개발 환경 연결, 남은 검증
+- **새 PC·새 Codex에서 기존 작업 이어가기:** [2026-09-29 인계](docs/codex-handoff-2026-09-29.md) — 현재 운영 대상, 배포 방법, 검증 기록, 인계 프롬프트. [2026-09-23 인계](docs/home-codex-handoff.md)는 과거 기록
 - **처음 설치하는 사람:** [설치·배포 안내](docs/install-human.md)
 - **AI 에이전트에게 맡길 때:** [에이전트 실행 지침](docs/install-agent.md), [AGENTS.md](AGENTS.md)
 - **게임과 코드 구조:** [기술 개요](docs/architecture.md)

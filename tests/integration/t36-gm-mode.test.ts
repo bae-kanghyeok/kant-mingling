@@ -52,8 +52,8 @@ async function action(game: Game, command: string, args: Record<string, unknown>
     const result = await executeGameCommand(ctx, command, body); await settleBlocks(ctx); return result;
   });
 }
-async function setup(studentCount = 5, teamCount = 1, start = true) {
-  event = await createTestEvent({ studentCount, teamCount, moveCountPerTeam: teamCount === 1 ? 0 : 1 });
+async function setup(studentCount = 5, teamCount = 1, start = true, moveCountPerTeam = teamCount === 1 ? 0 : 1) {
+  event = await createTestEvent({ studentCount, teamCount, moveCountPerTeam });
   await getPool().query("UPDATE events SET config_json=config_json || '{\"gameplayMode\":\"gm\"}'::jsonb WHERE id=$1", [event.id]);
   for (const id of [...event.students, ...event.operators]) sessions.set(id, await createTestSession(event, id));
   await getPool().query(`INSERT INTO profile_answers(event_id,participant_id,question_id,option,revision)
@@ -184,8 +184,8 @@ it("T36 per-game caps 0/1/2 and optional Ground Truth remain valid beyond GAME 9
   for (const actor of sessions.values()) expect((await getState(event.slug, actor.tokenHash)).event.phase).toBe("ENDED");
 }, 600_000);
 
-it("T36 three independent teams rotate after unequal game counts only when every GM is ready, and can exceed three rounds", async () => {
-  await setup(9, 3);
+it.each([{ studentCount: 9, moveCountPerTeam: 1 }, { studentCount: 18, moveCountPerTeam: 3 }])("T36 $studentCount students and three GMs rotate $moveCountPerTeam students per team after unequal game counts only when every GM is ready, and can exceed three rounds", async ({ studentCount, moveCountPerTeam }) => {
+  await setup(studentCount, 3, true, moveCountPerTeam);
   expect(await admin("open-guess", {}, "B", gm("C"))).toMatchObject({ ok: false, status: 403 });
   await finish("A"); success(await admin("gm-next-game", { noiseCap: 0, groundTruth: false }, "A", gm("A"))); await finish("A");
   await finish("B");
@@ -215,10 +215,18 @@ it("T36 three independent teams rotate after unequal game counts only when every
   success(await admin("publish-next-block", {}, undefined, host(), publishVersion));
   expect(await admin("publish-next-block", {}, undefined, host(), publishVersion)).toMatchObject({ ok: false, code: "STALE_VERSION" });
   const after = (await getPool().query("SELECT participant_id,team_id FROM block_assignments WHERE event_id=$1 AND block_no=2", [event.id])).rows;
-  expect(after).toHaveLength(12);
+  expect(before).toHaveLength(studentCount + 3);
+  expect(after).toHaveLength(studentCount + 3);
+  expect(new Set(after.map(row => row.participant_id)).size).toBe(studentCount + 3);
   const originalTeam = new Map(before.map(row => [row.participant_id, row.team_id]));
-  expect(after.filter(row => event.students.includes(row.participant_id) && row.team_id !== originalTeam.get(row.participant_id))).toHaveLength(3);
+  expect(after.filter(row => event.students.includes(row.participant_id) && row.team_id !== originalTeam.get(row.participant_id))).toHaveLength(moveCountPerTeam * 3);
   expect(after.filter(row => event.operators.includes(row.participant_id) && row.team_id !== originalTeam.get(row.participant_id))).toHaveLength(0);
+  const teamIds = new Set(before.map(row => row.team_id));
+  expect(teamIds.size).toBe(3);
+  for (const teamId of teamIds) {
+    expect(after.filter(row => row.team_id === teamId)).toHaveLength(studentCount / 3 + 1);
+    expect(after.filter(row => event.students.includes(row.participant_id) && originalTeam.get(row.participant_id) === teamId && row.team_id !== teamId)).toHaveLength(moveCountPerTeam);
+  }
   // Further rounds are GM choices, not a hard stop at block 3.
   for (let round = 2; round <= 3; round++) {
     for (const key of ["A", "B", "C"]) { success(await admin("start-block-game", { noiseCap: 0, groundTruth: false }, key, gm(key))); await finish(key); }

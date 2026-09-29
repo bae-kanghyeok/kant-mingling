@@ -1,8 +1,8 @@
 # KANT Mingling 작업 지침
 
 - 먼저 README, docs/architecture.md, docs/install-agent.md를 읽는다.
-- 새 PC나 새 대화에서 기존 작업을 인계받으면 docs/home-codex-handoff.md를 함께 읽는다. 최신 GM 작업은 develop에 있으며 기본 clone의 main과 구분한다.
-- main은 검증된 게임 기준 버전이다. UI·확장 작업은 develop 또는 그 하위 작업 브랜치에서 한다.
+- 새 PC나 새 대화에서 기존 작업을 인계받으면 docs/codex-handoff-2026-09-29.md를 먼저 읽는다. docs/home-codex-handoff.md는 2026-09-23 기록이며 whos-data 대상 안내는 더 쓰지 않는다.
+- main은 검증된 게임 기준 버전이며 2026-09-29부터 GM 모드를 포함한다. UI·확장 작업은 develop 또는 그 하위 작업 브랜치에서 한다.
 - Next.js의 설치 버전 문서는 node_modules/next/dist/docs/에 있다. 관련 가이드를 읽고 변경한다.
 - `.env*`의 내용을 읽거나 출력하지 않는다. 스크립트가 런타임에 로드하는 것은 허용한다. 키·쿠키·운영진 코드·실제 명단·프로필 답변을 로그나 커밋에 남기지 않는다.
 - 공개 전 정답·Noise 여부·원래 답변·RNG 정보를 DTO에 넣지 않는다. 일반 카드 본문과 질문 원문은 수신자에게만 전달한다. 사용자 승인(2026-09-22)에 따라 Noise 추리가 가능한 현재 Turn Lead에게만 별도 guess.cards로 지금까지 전달한 카드의 질문·표시 답변을 제공한다. 정답·실제/Noise 구분·원래 답은 포함하지 않는다. 관리자라는 이유만으로 이 예외를 적용하지 않는다.
