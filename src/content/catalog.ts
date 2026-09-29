@@ -4,12 +4,13 @@ import data from "./questions.v2.json";
 export const questionIdSchema = z.string().regex(/^Q(0[1-9]|1[0-9]|20)$/);
 export type QuestionId = `Q${string}`;
 export type Option = "A" | "B";
+// The 2026-09-29 list has no category; the card label then shows only "질문".
 const questionSchema = z.strictObject({
-  id: questionIdSchema, category: z.string().min(1),
+  id: questionIdSchema, category: z.string().min(1).optional(),
   options: z.strictObject({ A: z.string().min(1), B: z.string().min(1) }),
   followUp: z.string().min(1),
 });
-const catalog = z.strictObject({ contentVersion: z.literal("2026-09-22.1"),
+const catalog = z.strictObject({ contentVersion: z.literal("2026-09-29.1"),
   questions: z.array(questionSchema).length(20), }).parse(data);
 export const CONTENT_VERSION = catalog.contentVersion;
 export const questions = catalog.questions;

@@ -11,7 +11,7 @@ const number = (value: number) => String(value).padStart(2, "0");
 
 function CardContent({ question, text, answerLabel = "선택한 답변" }: { question?: CardQuestion; text: string; answerLabel?: string }) {
   return <div className="card-content">
-    {question && <div className="card-question"><p className="card-question-label">질문 · {question.category}</p><p className="card-question-options"><span>{question.options.A}</span><span className="card-question-vs">vs</span><span>{question.options.B}</span></p></div>}
+    {question && <div className="card-question"><p className="card-question-label">{question.category ? `질문 · ${question.category}` : "질문"}</p><p className="card-question-options"><span>{question.options.A}</span><span className="card-question-vs">vs</span><span>{question.options.B}</span></p></div>}
     <p className="card-answer"><span className="card-answer-label">{answerLabel}</span>{text}</p>
   </div>;
 }

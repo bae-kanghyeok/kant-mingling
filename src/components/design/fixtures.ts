@@ -62,7 +62,7 @@ const syntheticNow = "2026-01-01T09:00:00.000Z";
 const weather = questions.find((question) => question.options.A.includes("장마")) ?? questions[0];
 const otherQuestion = questions.find((question) => question.id !== weather.id) ?? questions[1];
 const thirdQuestion = questions.find((question) => question.id !== weather.id && question.id !== otherQuestion.id) ?? questions[2];
-const questionContext = (question: typeof questions[number]) => ({ category: question.category, options: question.options });
+const questionContext = (question: typeof questions[number]) => ({ ...(question.category ? { category: question.category } : {}), options: question.options });
 export const previewGuessCards = (game: PublicGame) => game.cards.map((card) => ({ cardNo: card.cardNo,
   question: card.question ?? questionContext(thirdQuestion), text: card.text ?? thirdQuestion.options.A }));
 

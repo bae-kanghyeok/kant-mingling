@@ -3,7 +3,7 @@ export type IntroKey = "tutorial" | "noise" | "ensemble" | "ground_truth";
 export type Person = { participantId: string; displayName: string; role: "student" | "operator" };
 export type TeamPhase = "SEATING" | "IN_GAME" | "REVEAL" | "BLOCK_DONE";
 export type GamePhase = "TURN" | "ENSEMBLE_SHARE" | "ENSEMBLE_VOTE" | "ENSEMBLE_DISCUSS" | "REVEALED";
-export type CardQuestion = { category: string; options: { A: string; B: string } };
+export type CardQuestion = { category?: string; options: { A: string; B: string } };
 export interface PublicGame {
   gm?: { guessOpen: boolean };
   gameId: string; gameNo: number; phase: GamePhase;

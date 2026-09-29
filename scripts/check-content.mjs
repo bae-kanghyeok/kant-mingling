@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const EXPECTED_VERSION = '2026-09-22.1';
+const EXPECTED_VERSION = '2026-09-29.1';
 const QUESTION_IDS = Array.from(
   { length: 20 },
   (_, index) => `Q${String(index + 1).padStart(2, '0')}`,
@@ -67,21 +67,21 @@ export function validateCatalog(catalog, sourceMarkdown) {
   requireCondition(Array.isArray(catalog.questions), 'questions 배열이 필요합니다.');
   requireCondition(catalog.questions.length === QUESTION_IDS.length, '문항 수는 정확히 20개여야 합니다.');
 
-  const questions = sourceRows(sourceMarkdown, 2, 4);
+  // 2026-09-29 기준표는 분류(구분)를 쓰지 않는다: §2는 ID | A | B.
+  const questions = sourceRows(sourceMarkdown, 2, 3);
   const followUps = sourceRows(sourceMarkdown, 4, 2);
 
   catalog.questions.forEach((question, index) => {
     const id = QUESTION_IDS[index];
-    requireKeys(question, ['id', 'category', 'options', 'followUp'], `questions[${index}]`);
+    requireKeys(question, ['id', 'options', 'followUp'], `questions[${index}]`);
     requireCondition(question.id === id, `questions[${index}]: Q01~Q20 연속 순서와 고유 ID가 필요합니다.`);
     requireKeys(question.options, ['A', 'B'], `${id}.options`);
-    requireExactText(question.category, questions[index][1], `${id}.category`);
-    requireExactText(question.options.A, questions[index][2], `${id}.options.A`);
-    requireExactText(question.options.B, questions[index][3], `${id}.options.B`);
+    requireExactText(question.options.A, questions[index][1], `${id}.options.A`);
+    requireExactText(question.options.B, questions[index][2], `${id}.options.B`);
     requireExactText(question.followUp, followUps[index][1], `${id}.followUp`);
   });
 
-  return { questionCount: QUESTION_IDS.length, matchedTextFields: QUESTION_IDS.length * 4 };
+  return { questionCount: QUESTION_IDS.length, matchedTextFields: QUESTION_IDS.length * 3 };
 }
 
 async function main() {

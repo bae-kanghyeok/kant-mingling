@@ -29,7 +29,7 @@ const membersFor = (s: EventSnapshot, gameId: string) => s.people.filter((p) => 
 const assignmentBlock = (s: EventSnapshot) => Math.max(1, s.event.current_block);
 const cardContent = (questionId: string, displayedOption: "A" | "B") => {
   const question = getQuestion(questionId);
-  return { question: { category: question.category, options: { A: question.options.A, B: question.options.B } },
+  return { question: { ...(question.category ? { category: question.category } : {}), options: { A: question.options.A, B: question.options.B } },
     text: question.options[displayedOption] };
 };
 

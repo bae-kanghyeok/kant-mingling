@@ -201,7 +201,7 @@ summary span { float: right; color: var(--accent); }
 .noise-choice-check { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); }
 .noise-choice.selected .noise-choice-check { border-color: var(--brand); background: var(--brand); color: white; }
 .noise-choice-question { display: flex; flex-direction: column; gap: 5px; line-height: 1.6; font-size: 13px; }
-.noise-choice-question > span:first-child, .noise-choice-vs { font-size: 11px; color: var(--muted); }
+.noise-choice-category, .noise-choice-vs { font-size: 11px; color: var(--muted); }
 .noise-choice-answer { display: flex; flex-direction: column; gap: 5px; line-height: 1.6; }
 .noise-choice-answer > span { font-size: 11px; color: var(--muted); }
 .noise-choice-answer strong { font-size: 15px; }

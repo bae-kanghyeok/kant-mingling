@@ -108,7 +108,7 @@ async function createFixture() {
     await db.query("BEGIN");
     ensureRunning();
     await db.query("INSERT INTO events(id,slug,title,config_json,content_version) VALUES($1,$2,$3,$4,$5)",
-      [ctx.id, ctx.slug, "KANT Mingling · 21명 플레이 리허설", JSON.stringify(config), "2026-09-22.1"]);
+      [ctx.id, ctx.slug, "KANT Mingling · 21명 플레이 리허설", JSON.stringify(config), "2026-09-29.1"]);
     ensureRunning();
     await db.query(`INSERT INTO participants(id,event_id,display_name,role,roster_order,attendance,profile_completed_at)
       SELECT p.id,$1,p.name,p.role,p.ord,'present',clock_timestamp() FROM jsonb_to_recordset($2::jsonb)
