@@ -35,14 +35,15 @@ describe("GM participant and facilitator surfaces", () => {
     expect(later).toContain(`앞선 추리에서 아니었던 분: ${first.displayName}`);
     expect(later).not.toContain("Data Owner가 아니에요!");
   });
-  it("marks ruled-out people in the next guess without disabling them", () => {
+  it("greys out and locks ruled-out people in the next guess", () => {
     const state = createPreviewState("gm-guess");
     const first = state.game!.candidates[0];
     state.game!.ruledOut = [{ ...first, atCard: 1 }];
     const html = renderToStaticMarkup(createElement(GuessModal, { state, game: state.game!, send: vi.fn(), busy: false, onClose: vi.fn(), onWrong: vi.fn() }));
     const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []).find((item) => item.includes(first.displayName))!;
-    expect(button).toContain("앞선 추리에서 아니었어요");
-    expect(button).not.toContain("disabled");
+    expect(button).toContain("✕ 아니었어요");
+    expect(button).toMatch(/<button[^>]*disabled=""/);
+    expect(html).toContain("고를 수 없어요");
   });
   it("names the Noise Data on a GM reveal", () => {
     const state = createPreviewState("gm-reveal");
@@ -81,7 +82,7 @@ describe("GM participant and facilitator surfaces", () => {
     const wrong = createPreviewState("gm-wrong");
     expect(renderToStaticMarkup(createElement(GameBoard, { state: wrong, game: wrong.game!, send: vi.fn(), busy: false }))).toContain("Data Owner가 아니에요!");
     const vote = createPreviewState("gm-vote");
-    expect(renderToStaticMarkup(createElement(GameBoard, { state: vote, game: vote.game!, send: vi.fn(), busy: false }))).toContain("추리에서 아니었어요");
+    expect(renderToStaticMarkup(createElement(GameBoard, { state: vote, game: vote.game!, send: vi.fn(), busy: false }))).toMatch(/<button[^>]*disabled=""[^>]*>[\s\S]*?✕ 아니었어요/);
     const team = createPreviewState("gm-team-remote");
     const teamHtml = renderToStaticMarkup(createElement(AdminPanel, { state: team, send: vi.fn(), busy: false, onClose: vi.fn() }));
     expect(teamHtml).not.toContain("전체 진행 · 총괄 GM");

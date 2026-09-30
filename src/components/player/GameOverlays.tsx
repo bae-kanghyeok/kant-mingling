@@ -52,7 +52,8 @@ export function GuessModal({ state, game, send, busy, onClose, onWrong }: {
   };
   return <Modal title="누가 Data Owner일까요?" onClose={onClose}>
     <p className="muted">팀원들과 상의한 뒤 한 명을 선택해주세요.</p>
-    <div className="choice-grid" role="radiogroup" aria-label="Data Owner 선택">{game.candidates.map((candidate) => <button key={candidate.participantId} role="radio" aria-checked={ownerPick === candidate.participantId} className={`choice-button ${ownerPick === candidate.participantId ? "selected" : ""} ${ruledOutIds.has(candidate.participantId) ? "ruled-out" : ""}`} onClick={() => setOwnerPick(candidate.participantId)}>{candidate.displayName}{ruledOutIds.has(candidate.participantId) && <small>앞선 추리에서 아니었어요</small>}</button>)}</div>
+    <div className="choice-grid" role="radiogroup" aria-label="Data Owner 선택">{game.candidates.map((candidate) => { const ruled = ruledOutIds.has(candidate.participantId); return <button key={candidate.participantId} role="radio" aria-checked={ownerPick === candidate.participantId} disabled={ruled} title={ruled ? "앞선 추리에서 Data Owner가 아니었어요" : undefined} className={`choice-button ${ownerPick === candidate.participantId ? "selected" : ""} ${ruled ? "ruled-out" : ""}`} onClick={() => setOwnerPick(candidate.participantId)}><span className="ruled-name">{candidate.displayName}</span>{ruled && <span className="ruled-badge">✕ 아니었어요</span>}</button>; })}</div>
+    {ruledOutIds.size > 0 && <p className="small muted ruled-hint">앞선 추리에서 Data Owner가 아니었던 분은 고를 수 없어요.</p>}
     {game.guess?.noiseCount !== undefined && <section className="noise-picker"><p className="pill">현재 Data {game.cards.length}개 / 이 중 Noise {k}개</p>{k > 0 && <>
       <h3>어떤 Data가 Noise라고 생각하나요?</h3>
       <p className="small muted">지금까지 우리 조에 전달된 질문과 답변을 다시 읽고, Noise로 의심되는 Data를 골라주세요.{game.gm && " Data Owner를 맞히면 Noise를 틀려도 정답이고, 정답 공개 때 Noise를 알려드려요."}</p>
