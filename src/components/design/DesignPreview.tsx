@@ -83,7 +83,10 @@ export default function DesignPreview({ embedded = false }: { embedded?: boolean
       else if (command === "force-end-game") navigate("reveal");
       else if (command === "end-session") navigate("ended");
       else if (command === "pause" || command === "resume") {
-        setState((current) => ({ ...current, admin: { ...current.admin!, teams: current.admin!.teams.map((team) => team.key === body?.teamKey ? { ...team, paused: command === "pause" } : team) } }));
+        // Mirror the server: a paused team offers resume (and the reverse), and its players see the pause.
+        setState((current) => ({ ...current, admin: { ...current.admin!, teams: current.admin!.teams.map((team) => team.key === body?.teamKey ? { ...team, paused: command === "pause" } : team) },
+          team: current.team && current.team.key === body?.teamKey ? { ...current.team, paused: command === "pause" } : current.team,
+          allowedActions: [...current.allowedActions.filter((action) => action !== "pause" && action !== "resume"), command === "pause" ? "resume" : "pause"] }));
       }
       setNotice("관리자 화면 체험이에요. 실제 참가자·설정·게임 진행은 변경하지 않았어요.");
     } else setNotice("버튼 동작을 확인했어요. 실제 게임은 변경하지 않았어요.");

@@ -92,6 +92,15 @@ describe("GM participant and facilitator surfaces", () => {
     expect(lobbyHtml).toContain("20문항 작성 중:");
     expect(lobbyHtml).toContain("결석 표시:");
   });
+  it("offers resume on the GM remote while the team is paused", () => {
+    const state = createPreviewState("gm-remote");
+    const own = state.admin!.teams.find((team) => team.key === state.team!.key)!;
+    own.paused = true;
+    state.allowedActions = [...state.allowedActions.filter((action) => action !== "pause"), "resume"];
+    const html = renderToStaticMarkup(createElement(GMRemote, { state, send: vi.fn(), busy: false }));
+    expect(html).toMatch(/<button class="button secondary">진행 재개<\/button>/);
+    expect(html).not.toContain("잠시 멈추기");
+  });
   it("does not treat the third rotation as the event finale", () => {
     const state = createPreviewState("gm-rotation");
     state.event.currentBlock = 3;
