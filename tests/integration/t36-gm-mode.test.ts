@@ -124,6 +124,8 @@ it.each([4, 6])("T36 %i people retain private cards while GM controls every tran
   expect(refreshed.game?.gm?.guessOpen).toBe(true); expect(refreshed.allowedActions).toContain("guess");
   const wrong = game.member_ids.find(id => id !== game.owner_participant_id)!;
   expect(success(await action(game, "guess", { ownerPick: wrong, noisePicks: [] }))).toEqual({ correct: false });
+  const teammate = sessions.get(game.member_ids.find(id => id !== game.turn_lead_participant_id)!)!;
+  expect((await getState(event.slug, teammate.tokenHash)).game?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count })]);
   expect((await getState(event.slug, lead.tokenHash)).game?.gm?.guessOpen).toBe(false);
   expect(await admin("open-guess", {}, "A")).toMatchObject({ ok: false, code: "GUESS_LOCKED" });
   success(await admin("pause", {}, "A")); game = await current();
@@ -162,6 +164,34 @@ it.each([4, 6])("T36 %i people retain private cards while GM controls every tran
   const early = await finish();
   expect(early.config_snapshot.gm.noiseCap).toBe(2);
   expect(early.card_count).toBe(3); expect(early.noise_picks.length).toBeLessThan(2);
+}, 240_000);
+
+it("T36 the Owner alone decides a GM guess, the team sees who a wrong guess ruled out, and the reveal names the true Noise", async () => {
+  await setup();
+  await finish();
+  success(await admin("gm-next-game", { noiseCap: 2, groundTruth: false }, "A"));
+  let game = await cardsTo("A", 3);
+  while (!game.noise_picks.length) game = await cardsTo("A", game.card_count + 1);
+  await acknowledge(game);
+  success(await admin("open-guess", {}, "A")); game = await current();
+  const teammate = sessions.get(game.member_ids.find(id => id !== game.turn_lead_participant_id)!)!;
+  // The right Noise does not rescue a wrong Owner; everyone sees who was ruled out.
+  const wrong = game.member_ids.find(id => id !== game.owner_participant_id)!;
+  expect(success(await action(game, "guess", { ownerPick: wrong, noisePicks: game.noise_picks }))).toEqual({ correct: false });
+  expect((await getState(event.slug, teammate.tokenHash)).game?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count })]);
+  game = await cardsTo("A", game.card_count + 1);
+  await acknowledge(game);
+  expect((await getState(event.slug, teammate.tokenHash)).game?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count - 1 })]);
+  success(await admin("open-guess", {}, "A")); game = await current();
+  // The right Owner with a wrong Noise pick wins, and the reveal shows the true Noise.
+  const real = Array.from({ length: game.card_count }, (_, index) => index + 1).filter(number => !game.noise_picks.includes(number));
+  const wrongNoise = [real[0], ...game.noise_picks].slice(0, game.noise_picks.length);
+  expect(wrongNoise).not.toEqual(game.noise_picks);
+  expect(success(await action(game, "guess", { ownerPick: game.owner_participant_id, noisePicks: wrongNoise }))).toEqual({ correct: true });
+  const revealed = (await getState(event.slug, teammate.tokenHash)).game!;
+  expect(revealed.reveal?.owner.participantId).toBe(game.owner_participant_id);
+  expect(revealed.reveal?.cards.filter(card => card.status === "NOISE").map(card => card.cardNo)).toEqual(game.noise_picks);
+  expect(revealed.ruledOut).toBeUndefined();
 }, 240_000);
 
 it("T36 per-game caps 0/1/2 and optional Ground Truth remain valid beyond GAME 9", async () => {

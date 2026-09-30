@@ -1,8 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { GameBoard, BlockDoneNotice } from "@/components/player/GameBoard";
+import { GameBoard, BlockDoneNotice, Reveal } from "@/components/player/GameBoard";
+import { GuessModal } from "@/components/player/GameOverlays";
 import { GMRemote } from "@/components/admin/GMRemote";
+import { AdminPanel } from "@/components/admin/AdminPanel";
 import { createPreviewState } from "@/components/design/fixtures";
 
 describe("GM participant and facilitator surfaces", () => {
@@ -20,6 +22,37 @@ describe("GM participant and facilitator surfaces", () => {
   it("restores wrong-answer guidance from server state after refresh", () => {
     expect(board("gm-talk", true)).toContain("아직 정답이 아니에요");
   });
+  it("tells the whole team who a wrong guess ruled out, then keeps a quiet reminder", () => {
+    const state = createPreviewState("gm-talk");
+    const [first, second] = state.game!.candidates;
+    state.game!.ruledOut = [{ ...first, atCard: state.game!.cards.length }];
+    delete state.game!.guess;
+    state.game!.turnLead = second;
+    const render = () => renderToStaticMarkup(createElement(GameBoard, { state, game: state.game!, send: vi.fn(), busy: false }));
+    expect(render()).toContain(`${first.displayName}님은 Data Owner가 아니에요!`);
+    state.game!.ruledOut = [{ ...first, atCard: state.game!.cards.length - 1 }];
+    const later = render();
+    expect(later).toContain(`앞선 추리에서 아니었던 분: ${first.displayName}`);
+    expect(later).not.toContain("Data Owner가 아니에요!");
+  });
+  it("marks ruled-out people in the next guess without disabling them", () => {
+    const state = createPreviewState("gm-guess");
+    const first = state.game!.candidates[0];
+    state.game!.ruledOut = [{ ...first, atCard: 1 }];
+    const html = renderToStaticMarkup(createElement(GuessModal, { state, game: state.game!, send: vi.fn(), busy: false, onClose: vi.fn(), onWrong: vi.fn() }));
+    const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []).find((item) => item.includes(first.displayName))!;
+    expect(button).toContain("앞선 추리에서 아니었어요");
+    expect(button).not.toContain("disabled");
+  });
+  it("names the Noise Data on a GM reveal", () => {
+    const state = createPreviewState("gm-reveal");
+    const game = state.game ?? state.lastReveal!;
+    game.gm = { guessOpen: false };
+    game.reveal!.cards[0].status = "NOISE";
+    const html = renderToStaticMarkup(createElement(Reveal, { game }));
+    expect(html).toContain("이번 판 Noise");
+    expect(html).toContain(`Data ${String(game.reveal!.cards[0].cardNo).padStart(2, "0")}`);
+  });
   it("provides GM pacing without revealing another recipient's card", () => {
     const state = createPreviewState("gm-remote");
     const html = renderToStaticMarkup(createElement(GMRemote, { state, send: vi.fn(), busy: false }));
@@ -28,6 +61,21 @@ describe("GM participant and facilitator surfaces", () => {
     expect(html).not.toContain("365일 폭염");
     state.me!.role = "student";
     expect(renderToStaticMarkup(createElement(GMRemote, { state, send: vi.fn(), busy: false }))).toBe("");
+  });
+  it("shows a team GM only their own team without head GM tools or logs", () => {
+    const state = createPreviewState("gm-remote");
+    const render = () => renderToStaticMarkup(createElement(AdminPanel, { state, send: vi.fn(), busy: false, onClose: vi.fn() }));
+    expect(state.admin!.teams.length).toBeGreaterThan(1);
+    const hostHtml = render();
+    expect(hostHtml).toContain("전체 진행 · 총괄 GM");
+    expect(hostHtml.match(/class="admin-team-card/g)).toHaveLength(state.admin!.teams.length);
+    state.admin!.isHost = false;
+    const teamHtml = render();
+    expect(teamHtml).not.toContain("전체 진행 · 총괄 GM");
+    expect(teamHtml).not.toContain("조 선택");
+    expect(teamHtml).not.toContain(">로그</button>");
+    expect(teamHtml.match(/class="admin-team-card/g)).toHaveLength(1);
+    expect(teamHtml).toContain("정답 공개하고 이번 판 끝내기");
   });
   it("does not treat the third rotation as the event finale", () => {
     const state = createPreviewState("gm-rotation");

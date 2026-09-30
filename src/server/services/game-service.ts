@@ -345,7 +345,7 @@ async function dispatchGameCommand(ctx: TxContext, command: string, args: Record
     const extra = parse(z.object({ ownerPick: z.string().uuid(), noisePicks: z.array(z.number().int().min(1).max(20)).max(5) }), args);
     const result = evaluateGuess({ gameNo: game.game_no, settings: parseTeamSettings(game.config_snapshot), phase: game.phase,
       paused: false, guessLocked: game.guess_locked, cards, memberIds: members.map((member) => member.id), ownerId: game.owner_participant_id,
-      ...extra, groundTruthCardNos: loaded.groundTruthCardNos, noiseIntroSeen: loaded.viewerNoiseSeen });
+      ...extra, groundTruthCardNos: loaded.groundTruthCardNos, noiseIntroSeen: loaded.viewerNoiseSeen, ownerDecides: gm });
     await ctx.client.query(`INSERT INTO guess_attempts(game_id,attempt_no,submitted_by,owner_pick,noise_picks,revealed_count,correct,created_at)
       SELECT $1,COALESCE(max(attempt_no),0)+1,$2,$3,$4,$5,$6,$7 FROM guess_attempts WHERE game_id=$1`,
     [game.id, participantId, extra.ownerPick, extra.noisePicks, cards.length, result.correct, ctx.now]);

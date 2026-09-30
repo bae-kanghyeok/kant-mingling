@@ -11,6 +11,8 @@ const sessionCommands = new Set(["assign-teams", "publish-teams", "start-game1",
 const gameCommands = new Set(["transfer-turn-lead", "resend-data", "ensemble-shared", "ensemble-end-discussion", "open-guess", "close-guess"]);
 const labels: Record<string, string> = { "request-rotation": "조 이동 준비 요청", "cancel-rotation": "이동 요청 취소", "rotation-ready": "이동 준비 완료", "gm-next-game": "다음 Game", "open-guess": "추리 열기", "close-guess": "추리 닫기", "assign-teams": "조 편성", "publish-teams": "조 배정 공개", "start-game1": "Game 1 전체 시작", "publish-next-block": "다음 블록 시작", "start-block-game": "착석 완료 · Game 시작", "next-game": "다음 Game", pause: "Game 일시정지", resume: "Game 재개", "force-end-game": "현재 Game 종료", "end-session": "전체 종료", "transfer-host": "호스트 이전", "unlock-participant": "잠금 해제", "transfer-turn-lead": "Turn Lead 변경", "resend-data": "Data 재전송", "ensemble-shared": "공유 단계 넘기기", "ensemble-end-discussion": "토론 마침", "swap-seats": "자리 교환", "mark-attendance": "출석 변경", "upsert-participant": "명단 저장", "remove-participant": "명단에서 제외", "update-team-settings": "조 설정 저장", "update-global-settings": "전체 설정 저장", "apply-preset": "프리셋 적용" };
 const confirmationCommands = new Set(["publish-teams", "publish-next-block", "start-game1", "force-end-game", "end-session", "transfer-host", "unlock-participant", "remove-participant", "request-rotation", "cancel-rotation"]);
+// 을/를 by the last Hangul syllable's final consonant (other characters default to 을).
+const objectParticle = (word: string) => { const code = word.charCodeAt(word.length - 1) - 0xac00; return code >= 0 && code <= 11171 && code % 28 === 0 ? "를" : "을"; };
 const minutes = (milliseconds: number | null) => milliseconds === null ? "—" : `${Math.floor(milliseconds / 60000)}분 ${Math.floor(milliseconds / 1000) % 60}초`;
 const gameStageLabels: Record<GamePhase, string> = { TURN: "단서·추리", ENSEMBLE_SHARE: "Data 공유", ENSEMBLE_VOTE: "개별 투표", ENSEMBLE_DISCUSS: "결과 토론", REVEALED: "정답 공개" };
 
@@ -40,8 +42,11 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
   const gmMode = state.event.gameplayMode === "gm";
   const admin = state.admin;
   if (!admin) return null;
-  const commandLabel = (command: string) => gmMode && command === "publish-next-block" ? "새 조 공개 · 이동 시작" : command === "start-block-game" && state.event.teamCount === 1 ? "준비 완료 · Game 시작" : labels[command] ?? command;
-  const team = admin.teams.find((item) => item.key === teamKey);
+  // Watching every team is the head GM's job; a team GM's remote shows only their own team.
+  const teamGmOnly = gmMode && !admin.isHost;
+  const teams = teamGmOnly ? admin.teams.filter((item) => item.key === state.team?.key) : admin.teams;
+  const commandLabel = (command: string) => gmMode && command === "publish-next-block" ? "새 조 공개 · 이동 시작" : gmMode && command === "force-end-game" ? "정답 공개하고 이번 판 끝내기" : command === "start-block-game" && state.event.teamCount === 1 ? "준비 완료 · Game 시작" : labels[command] ?? command;
+  const team = teams.find((item) => item.key === teamKey);
   const can = (command: string) => state.allowedActions.includes(command);
   const execute = async (command: string, args: Record<string, unknown> = {}) => {
     setMessage(null);
@@ -58,8 +63,8 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
     if (confirmationCommands.has(command)) { setConfirm({ command, args, stage: 1 }); return; }
     return execute(command, args);
   };
-  const roster = admin.registration ?? admin.teams.flatMap((item) => item.members.map((member) => ({ ...member, locked: false })));
-  const presenceByParticipant = new Map(admin.teams.flatMap((item) => item.members.map((member) => [member.participantId, member.online] as const)));
+  const roster = admin.registration ?? teams.flatMap((item) => item.members.map((member) => ({ ...member, locked: false })));
+  const presenceByParticipant = new Map(teams.flatMap((item) => item.members.map((member) => [member.participantId, member.online] as const)));
   const validForTeam = (command: string) => {
     if (sessionCommands.has(command)) return true;
     if (!team?.canControl) return false;
@@ -75,14 +80,14 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
   const button = (command: string, args = {}) => can(command) && validForTeam(command) && <button key={command} className={`button ${command.includes("end") ? "danger-outline" : "secondary"}`} disabled={busy} onClick={() => void run(command, args)}>{commandLabel(command)}</button>;
   return <Modal title={gmMode ? "GM 리모컨" : "관리자"} onClose={onClose} wide className="admin-panel">
     <p className="small muted">{gmMode ? "GM도 함께 추리해요. 정답은 공개 전까지 볼 수 없어요." : "관리자 화면에서도 정답 정보는 공개되지 않습니다."}</p>
-    <nav className="admin-tabs" aria-label="관리자 메뉴">{[["progress", "진행"], ["people", "참가자"], ["settings", "설정"], ["logs", "로그"]].map(([key, label]) => <button key={key} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
+    <nav className="admin-tabs" aria-label="관리자 메뉴">{[["progress", "진행"], ["people", "참가자"], ["settings", "설정"], ...(teamGmOnly ? [] : [["logs", "로그"]])].map(([key, label]) => <button key={key} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
     {message && <p className="notice" role="status">{message}</p>}
-    {tab !== "logs" && admin.teams.length > 0 && <label className="team-select">조 선택<select value={teamKey} onChange={(event) => { setTeamKey(event.target.value); setTarget(""); }}>
-      {admin.teams.map((item) => <option key={item.key} value={item.key}>{item.key}조 · {item.operatorName}</option>)}
+    {tab !== "logs" && teams.length > 1 && <label className="team-select">조 선택<select value={teamKey} onChange={(event) => { setTeamKey(event.target.value); setTarget(""); }}>
+      {teams.map((item) => <option key={item.key} value={item.key}>{item.key}조 · {item.operatorName}</option>)}
     </select></label>}
     {tab === "progress" && <>
       {gmMode && teamKey === state.team?.key && <GMRemote state={state} send={send} busy={busy} onReturnToGame={onClose} />}
-      <div className="admin-team-grid">{admin.teams.map((item) => <button className={`admin-team-card ${item.key === teamKey ? "selected" : ""}`} key={item.key} onClick={() => setTeamKey(item.key)}><div className="inline-between"><strong>{item.key}조</strong><span className="badge">{item.paused ? "일시정지" : item.phase === "BLOCK_DONE" ? gmMode ? "이동 준비 완료" : "블록 완료" : item.phase === "SEATING" ? "착석 대기" : item.gameNo ? `Game ${item.gameNo}` : "준비"}</span></div><p className="admin-stage">{item.gameNo ? `Game ${item.gameNo} · ` : "현재 단계 · "}{item.stage ? gameStageLabels[item.stage as GamePhase] ?? "진행 상태 확인 중" : item.phase === "SEATING" ? "착석 대기" : "준비"}</p><p>온라인 {item.members.filter((member) => member.online).length} / {item.members.length}명</p><p>Data {item.revealedCount} · {item.turnLeadName ?? "대기 중"}</p><p className={`small ${item.timers.blockElapsedMs !== null && item.timers.blockElapsedMs > item.timers.blockTargetMs * 1.3 ? "overdue" : "muted"}`}>Game {minutes(item.timers.gameElapsedMs)}<br />{gmMode ? "현재 자리" : "블록"} {minutes(item.timers.blockElapsedMs)} / 목표 {minutes(item.timers.blockTargetMs)}</p></button>)}</div>
+      <div className="admin-team-grid">{teams.map((item) => <button className={`admin-team-card ${item.key === teamKey ? "selected" : ""}`} key={item.key} onClick={() => setTeamKey(item.key)}><div className="inline-between"><strong>{item.key}조</strong><span className="badge">{item.paused ? "일시정지" : item.phase === "BLOCK_DONE" ? gmMode ? "이동 준비 완료" : "블록 완료" : item.phase === "SEATING" ? "착석 대기" : item.gameNo ? `Game ${item.gameNo}` : "준비"}</span></div><p className="admin-stage">{item.gameNo ? `Game ${item.gameNo} · ` : "현재 단계 · "}{item.stage ? gameStageLabels[item.stage as GamePhase] ?? "진행 상태 확인 중" : item.phase === "SEATING" ? "착석 대기" : "준비"}</p><p>온라인 {item.members.filter((member) => member.online).length} / {item.members.length}명</p><p>Data {item.revealedCount} · {item.turnLeadName ?? "대기 중"}</p><p className={`small ${item.timers.blockElapsedMs !== null && item.timers.blockElapsedMs > item.timers.blockTargetMs * 1.3 ? "overdue" : "muted"}`}>Game {minutes(item.timers.gameElapsedMs)}<br />{gmMode ? "현재 자리" : "블록"} {minutes(item.timers.blockElapsedMs)} / 목표 {minutes(item.timers.blockTargetMs)}</p></button>)}</div>
       <p className="small muted">참고용 타이머 · 자동 종료 없음</p>
       {team && <section className="admin-presence" aria-label={`${team.key}조 참가자 연결`}><h3>{team.key}조 참가자 연결</h3><p className="small muted">최근 연결 기록 기준이며, 출석·결석 기록과는 별개예요.</p><ul className="admin-presence-list">{team.members.map((person) => <li key={person.participantId}><span>{person.displayName}{person.role === "operator" && <small className="muted"> · 운영진</small>}</span><ConnectionStatus online={person.online} /></li>)}</ul></section>}
       <div className="action-grid">{(gmMode ? ["pause", "resume", "force-end-game"] : ["pause", "resume", "force-end-game", "next-game", "start-block-game", "ensemble-shared", "ensemble-end-discussion"]).map((command) => button(command))}</div>
@@ -107,6 +112,6 @@ export function AdminPanel({ state, send, busy, onClose, initialTab = "progress"
     </>}
     {tab === "settings" && <>{team?.canControl && can("update-team-settings") && <TeamSettingsForm gmMode={gmMode} key={`${team.key}:${JSON.stringify(team.settings)}`} settings={team.settings} save={run} busy={busy} />}{admin.isHost && admin.globalSettings && can("update-global-settings") && <details className="global-settings"><summary>전체 설정 · 호스트</summary><GlobalSettingsForm key={JSON.stringify(admin.globalSettings)} settings={admin.globalSettings} save={run} busy={busy} operatorNames={roster.filter((person) => person.role === "operator" && !("active" in person && person.active === false)).map((person) => person.displayName)} /></details>}</>}
     {tab === "logs" && <ol className="operation-log">{admin.recentLogs.map((log, index) => <li key={`${log.at}:${index}`}><time>{new Date(log.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time><p><strong>{log.actorName}</strong> · {labels[log.command] ?? "진행 변경"}{log.target && <span className="small muted"> · {log.target}</span>}</p></li>)}{admin.recentLogs.length === 0 && <p className="muted">아직 운영 기록이 없어요.</p>}</ol>}
-    {confirm && <Modal title={`${commandLabel(confirm.command)}을 진행할까요?`} onClose={() => setConfirm(null)}><p>{confirm.command.includes("end") ? "진행 중인 Game은 정답을 공개한 뒤 종료해요." : confirm.command === "unlock-participant" ? "기존 기기의 연결을 해제합니다. 참가자는 본인 이름을 다시 선택할 수 있어요." : "참가자 화면에도 변경 사항이 반영돼요."}</p>{confirm.command === "end-session" && !!confirm.args.emergency && <p className="error-message">전체 비상 종료 확인 {confirm.stage} / 2</p>}<div className="action-grid"><button className="button secondary" onClick={() => setConfirm(null)}>취소</button><button className="button primary" disabled={busy} onClick={() => { if (confirm.command === "end-session" && confirm.args.emergency && confirm.stage === 1) { setConfirm({ ...confirm, stage: 2 }); return; } const { command, args } = confirm; setConfirm(null); void execute(command, args); }}>확인</button></div></Modal>}
+    {confirm && <Modal title={`${commandLabel(confirm.command)}${objectParticle(commandLabel(confirm.command))} 진행할까요?`} onClose={() => setConfirm(null)}><p>{confirm.command.includes("end") ? "진행 중인 Game은 정답을 공개한 뒤 종료해요." : confirm.command === "unlock-participant" ? "기존 기기의 연결을 해제합니다. 참가자는 본인 이름을 다시 선택할 수 있어요." : "참가자 화면에도 변경 사항이 반영돼요."}</p>{confirm.command === "end-session" && !!confirm.args.emergency && <p className="error-message">전체 비상 종료 확인 {confirm.stage} / 2</p>}<div className="action-grid"><button className="button secondary" onClick={() => setConfirm(null)}>취소</button><button className="button primary" disabled={busy} onClick={() => { if (confirm.command === "end-session" && confirm.args.emergency && confirm.stage === 1) { setConfirm({ ...confirm, stage: 2 }); return; } const { command, args } = confirm; setConfirm(null); void execute(command, args); }}>확인</button></div></Modal>}
   </Modal>;
 }

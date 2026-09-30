@@ -58,6 +58,15 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
         ...(gtCard?.id === card.id ? { verified: true as const } : {}) };
     }),
   };
+  // GM mode: a wrong guess means that pick is not the Owner, so the whole team sees it. An attempt
+  // from before this rule (Owner right, Noise wrong) is never shown as ruled out.
+  if (gm && !isRevealed) {
+    const lastWrong = new Map<string, number>();
+    for (const row of (s.guesses ?? []).filter((r) => r.game_id === game.id && !r.correct && r.owner_pick !== game.owner_participant_id)
+      .sort((a, b) => a.attempt_no - b.attempt_no)) { lastWrong.delete(row.owner_pick); lastWrong.set(row.owner_pick, row.revealed_count); }
+    const ruledOut = [...lastWrong].flatMap(([id, atCard]) => { const p = members.find((m) => m.id === id); return p ? [{ ...named(p), atCard }] : []; });
+    if (ruledOut.length) out.ruledOut = ruledOut;
+  }
   if (isLead && !isRevealed) {
     const enabled = game.phase === "TURN" && !block?.paused_at && cards.length >= guessThreshold && !game.guess_locked && (!gm || !!game.gm_guess_open);
     out.guess = { enabled, locked: game.guess_locked, ...(enabled && intros.includes("noise") ? { noiseCount } : {}) };

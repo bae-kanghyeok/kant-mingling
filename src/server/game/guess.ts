@@ -16,6 +16,8 @@ export interface EvaluateGuessInput {
   noisePicks: readonly number[];
   groundTruthCardNos?: readonly number[];
   noiseIntroSeen: boolean;
+  /** GM mode: the Owner pick alone decides. Noise picks are still required, and the reveal shows the true Noise. */
+  ownerDecides?: boolean;
 }
 
 export function evaluateGuess(input: EvaluateGuessInput): { correct: boolean; guessLocked: boolean; exhausted: boolean } {
@@ -30,6 +32,6 @@ export function evaluateGuess(input: EvaluateGuessInput): { correct: boolean; gu
     throw new GameRuleError('INVALID_GUESS');
   }
   if (noises.length && !input.noiseIntroSeen) throw new GameRuleError('INTRO_REQUIRED');
-  const correct = input.ownerPick === input.ownerId && noises.every((number) => input.noisePicks.includes(number));
+  const correct = input.ownerPick === input.ownerId && (!!input.ownerDecides || noises.every((number) => input.noisePicks.includes(number)));
   return { correct, guessLocked: !correct && !exhausted, exhausted };
 }

@@ -18,7 +18,7 @@ export function RuleOverlay({ game, groundTruthIntroSeen, send, busy }: { game: 
   if (overlay.kind === "noise") return <Modal title="잠깐, Noise가 숨어 있습니다">
     <div className="rule-symbol" aria-hidden="true">≠</div><h3>지금까지 본 Data가 전부 진짜는 아닙니다.</h3>
     <p>{game.gm ? "Noise 확인! 어떤 단서가 Noise일까요? 지금까지의 선택과 이유를 함께 이야기해보세요." : `현재 공개된 Data ${overlay.cardCount ?? game.cards.length}개 중 Noise ${overlay.noiseCount ?? 1}개가 숨어 있습니다.`}</p>
-    <p className="muted">Data Owner와 함께 어떤 Data가 Noise인지도 찾아보세요.</p>
+    <p className="muted">{game.gm ? "추리할 때 Noise로 보이는 Data도 골라요. Data Owner만 맞히면 정답이고, 어떤 Data가 Noise였는지는 정답 공개 때 알려드려요." : "Data Owner와 함께 어떤 Data가 Noise인지도 찾아보세요."}</p>
     {errorNotice}<button className="button primary full" disabled={busy} onClick={acknowledge}>{game.gm ? "확인했어요" : "추리 시작하기"}</button>
   </Modal>;
   if (overlay.kind === "ensemble") return <Modal title="잠깐, Ensemble이 시작됩니다">
@@ -39,6 +39,7 @@ export function GuessModal({ state, game, send, busy, onClose, onWrong }: {
   const [noisePicks, setNoisePicks] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const k = game.guess?.noiseCount ?? 0;
+  const ruledOutIds = new Set((game.ruledOut ?? []).map((person) => person.participantId));
   const reviewCards = new Map(game.guess?.cards?.map((card) => [card.cardNo, card]));
   const noiseChoices = game.cards.map((card) => ({ ...card, ...reviewCards.get(card.cardNo) }));
   const submit = async () => {
@@ -51,10 +52,10 @@ export function GuessModal({ state, game, send, busy, onClose, onWrong }: {
   };
   return <Modal title="누가 Data Owner일까요?" onClose={onClose}>
     <p className="muted">팀원들과 상의한 뒤 한 명을 선택해주세요.</p>
-    <div className="choice-grid" role="radiogroup" aria-label="Data Owner 선택">{game.candidates.map((candidate) => <button key={candidate.participantId} role="radio" aria-checked={ownerPick === candidate.participantId} className={`choice-button ${ownerPick === candidate.participantId ? "selected" : ""}`} onClick={() => setOwnerPick(candidate.participantId)}>{candidate.displayName}</button>)}</div>
+    <div className="choice-grid" role="radiogroup" aria-label="Data Owner 선택">{game.candidates.map((candidate) => <button key={candidate.participantId} role="radio" aria-checked={ownerPick === candidate.participantId} className={`choice-button ${ownerPick === candidate.participantId ? "selected" : ""} ${ruledOutIds.has(candidate.participantId) ? "ruled-out" : ""}`} onClick={() => setOwnerPick(candidate.participantId)}>{candidate.displayName}{ruledOutIds.has(candidate.participantId) && <small>앞선 추리에서 아니었어요</small>}</button>)}</div>
     {game.guess?.noiseCount !== undefined && <section className="noise-picker"><p className="pill">현재 Data {game.cards.length}개 / 이 중 Noise {k}개</p>{k > 0 && <>
       <h3>어떤 Data가 Noise라고 생각하나요?</h3>
-      <p className="small muted">지금까지 우리 조에 전달된 질문과 답변을 다시 읽고, Noise로 의심되는 Data를 골라주세요.</p>
+      <p className="small muted">지금까지 우리 조에 전달된 질문과 답변을 다시 읽고, Noise로 의심되는 Data를 골라주세요.{game.gm && " Data Owner를 맞히면 Noise를 틀려도 정답이고, 정답 공개 때 Noise를 알려드려요."}</p>
       <div className="noise-choice-list" role="group" aria-label="Noise로 의심되는 Data 선택">{noiseChoices.map((card) => <button key={card.cardNo} className={`choice-button noise-choice ${noisePicks.includes(card.cardNo) ? "selected" : ""}`} aria-pressed={noisePicks.includes(card.cardNo)} disabled={!!card.verified || (!noisePicks.includes(card.cardNo) && noisePicks.length >= k)} onClick={() => setNoisePicks((current) => current.includes(card.cardNo) ? current.filter((number) => number !== card.cardNo) : [...current, card.cardNo])}>
         <span className="noise-choice-heading"><strong>Data {dataNumber(card.cardNo)}</strong>{card.verified ? <span className="badge verified">Verified · 선택 불가</span> : <span className="noise-choice-check" aria-hidden="true">{noisePicks.includes(card.cardNo) ? "✓" : "+"}</span>}</span>
         {card.text !== undefined ? <>

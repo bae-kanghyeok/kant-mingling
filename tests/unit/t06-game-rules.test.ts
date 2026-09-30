@@ -124,6 +124,11 @@ describe('T13/T14 guess contract', () => {
     expect(() => evaluateGuess({ ...base, noisePicks: [2, 2] })).toThrow('INVALID_GUESS');
     expect(() => evaluateGuess({ ...base, groundTruthCardNos: [2] })).toThrow('INVALID_GUESS');
   });
+  it('lets the Owner alone decide in GM mode while still requiring the Noise picks', () => {
+    expect(evaluateGuess({ ...base, ownerDecides: true, noisePicks: [3] })).toEqual({ correct: true, guessLocked: false, exhausted: false });
+    expect(evaluateGuess({ ...base, ownerDecides: true, ownerPick: 'p1' })).toEqual({ correct: false, guessLocked: true, exhausted: false });
+    expect(() => evaluateGuess({ ...base, ownerDecides: true, noisePicks: [] })).toThrow('INVALID_GUESS');
+  });
   it('applies first-game exception and unlocks repeated guesses only after 20 cards', () => {
     expect(evaluateGuess({ ...base, gameNo: 1, cards: [card(1)], noisePicks: [] }).correct).toBe(true);
     expect(() => evaluateGuess({ ...base, cards: [card(1)], noisePicks: [] })).toThrow('NOT_ENOUGH_DATA');

@@ -11,6 +11,8 @@ export interface PublicGame {
   candidates: Pick<Person,"participantId"|"displayName">[];
   cards: { cardNo: number; recipients: Pick<Person,"participantId"|"displayName">[]; question?: CardQuestion; text?: string; verified?: true }[];
   exhausted: boolean;
+  /** GM mode: people a wrong guess ruled out, latest last; atCard is the Data count at that guess. */
+  ruledOut?: (Pick<Person,"participantId"|"displayName"> & { atCard: number })[];
   guess?: { enabled: boolean; locked: boolean; noiseCount?: number;
     cards?: { cardNo: number; question: CardQuestion; text: string }[] };
   ensemble?: { stage: "SHARE"|"VOTE"|"DISCUSS"; triggerCardNo: number; sharer: Pick<Person,"participantId"|"displayName">;

@@ -160,6 +160,13 @@ it("T37 viewer-scoped snapshot yields the full snapshot's DTO for every viewer t
   success(await admin("transfer-turn-lead", { participantId: cRecipient }, "C", gm("C")));
   await compareAll("B paused, C resend + lead change", viewers);
   success(await admin("resume", {}, "B", gm("B")));
+  // Team B guesses a wrong Owner: every B member sees who was ruled out.
+  success(await admin("open-guess", {}, "B", gm("B")));
+  game = await current("B");
+  const bWrong = game.member_ids.find(id => id !== game.owner_participant_id)!;
+  expect(success(await action(game, "guess", { ownerPick: bWrong, noisePicks: [] }, sessions.get(game.turn_lead_participant_id)!))).toEqual({ correct: false });
+  await compareAll("B wrong guess", viewers);
+  await nextCard("B");
 
   await finish("A", 1); await compareAll("A revealed", viewers);
   success(await admin("gm-next-game", { noiseCap: 2, groundTruth: true }, "A", gm("A")));

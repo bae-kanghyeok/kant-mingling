@@ -41,6 +41,7 @@ export interface EventSnapshot {
   members: { game_id: string; participant_id: string }[];
   deliveries: { card_id: string; participant_id: string }[];
   votes: { game_id: string; voter_id: string; pick_id: string; revision: number }[];
+  guesses?: { game_id: string; owner_pick: string; attempt_no: number; revealed_count: number; correct: boolean }[];
   groundTruths: { game_id: string; card_id: string }[];
   intros: { participant_id: string; intro_key: IntroKey }[];
   overlays: { game_id: string; participant_id: string; kind: string }[];
@@ -57,7 +58,8 @@ export interface EventSnapshot {
 //   only games the viewer plays in;
 // - profiles: the viewer's own answers plus, for a revealed game they played, every member's
 //   answers to that game's card questions (all Behind the Data selection compares);
-// - sessions: one active row per participant, which is all online()/locked() test.
+// - sessions: one active row per participant, which is all online()/locked() test;
+// - guesses: wrong guesses in games the viewer plays in (GM mode shows who was ruled out).
 // tests/integration/t37-viewer-snapshot.test.ts proves the DTO equals the full snapshot's.
 export const snapshotSql = `WITH t AS (SELECT clock_timestamp() AS now),
 e AS (SELECT * FROM events WHERE slug=$1),
@@ -114,6 +116,9 @@ SELECT jsonb_build_object(
     FROM card_deliveries d JOIN data_cards c ON c.id=d.card_id WHERE c.game_id IN (SELECT id FROM child)),'[]'::jsonb),
   'votes',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',v.game_id,'voter_id',v.voter_id,'pick_id',v.pick_id,'revision',v.revision))
     FROM ensemble_votes v WHERE v.game_id IN (SELECT id FROM child)),'[]'::jsonb),
+  'guesses',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',a.game_id,'owner_pick',a.owner_pick,'attempt_no',a.attempt_no,
+    'revealed_count',a.revealed_count,'correct',a.correct) ORDER BY a.game_id,a.attempt_no)
+    FROM guess_attempts a WHERE a.game_id IN (SELECT id FROM mine) AND NOT a.correct),'[]'::jsonb),
   'groundTruths',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',r.game_id,'card_id',r.card_id))
     FROM ground_truths r WHERE r.game_id IN (SELECT id FROM child)),'[]'::jsonb),
   'intros',COALESCE((SELECT jsonb_agg(jsonb_build_object('participant_id',i.participant_id,'intro_key',i.intro_key))
