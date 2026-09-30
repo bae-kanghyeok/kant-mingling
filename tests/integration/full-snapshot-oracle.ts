@@ -21,7 +21,7 @@ export const fullSnapshotSql = `SELECT jsonb_build_object(
   'members',COALESCE((SELECT jsonb_agg(to_jsonb(m)) FROM game_members m JOIN games g ON g.id=m.game_id WHERE g.event_id=e.id),'[]'::jsonb),
   'deliveries',COALESCE((SELECT jsonb_agg(to_jsonb(d)) FROM card_deliveries d JOIN data_cards c ON c.id=d.card_id JOIN games g ON g.id=c.game_id WHERE g.event_id=e.id),'[]'::jsonb),
   'votes',COALESCE((SELECT jsonb_agg(to_jsonb(v)) FROM ensemble_votes v JOIN games g ON g.id=v.game_id WHERE g.event_id=e.id),'[]'::jsonb),
-  'guesses',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',a.game_id,'owner_pick',a.owner_pick,'attempt_no',a.attempt_no,
+  'guesses',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',a.game_id,'owner_pick',a.owner_pick,'noise_picks',a.noise_picks,'attempt_no',a.attempt_no,
     'revealed_count',a.revealed_count,'correct',a.correct) ORDER BY a.game_id,a.attempt_no)
     FROM guess_attempts a JOIN games g ON g.id=a.game_id WHERE g.event_id=e.id),'[]'::jsonb),
   'groundTruths',COALESCE((SELECT jsonb_agg(to_jsonb(t)) FROM ground_truths t JOIN games g ON g.id=t.game_id WHERE g.event_id=e.id),'[]'::jsonb),

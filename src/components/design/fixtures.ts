@@ -148,6 +148,7 @@ export function createPreviewState(view: PreviewView): PublicState {
       // gm-guess shows an earlier wrong guess as a reminder and a mark in the guess choices.
       base.game.ruledOut = [{ ...other, atCard: view === "gm-wrong" ? base.game.cards.length : Math.max(1, base.game.cards.length - 1) }];
       if (view === "gm-wrong" && base.game.guess) base.game.guess.locked = true;
+      if (view === "gm-guess") base.game.notNoise = [base.game.cards[0].cardNo];
     }
     if (view === "gm-team-remote" && base.admin) {
       base.me = { ...base.me!, isHost: false }; base.admin.isHost = false;

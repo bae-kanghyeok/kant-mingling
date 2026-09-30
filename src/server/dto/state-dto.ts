@@ -66,6 +66,11 @@ function gameDto(s: EventSnapshot, game: SnapshotGame, me: SnapshotPerson, intro
       .sort((a, b) => a.attempt_no - b.attempt_no)) { lastWrong.delete(row.owner_pick); lastWrong.set(row.owner_pick, row.revealed_count); }
     const ruledOut = [...lastWrong].flatMap(([id, atCard]) => { const p = members.find((m) => m.id === id); return p ? [{ ...named(p), atCard }] : []; });
     if (ruledOut.length) out.ruledOut = ruledOut;
+    // A card a wrong guess picked as Noise but that is real can no longer be picked as Noise.
+    const real = new Set(cards.filter((card) => !card.is_noise).map((card) => card.card_no));
+    const notNoise = [...new Set((s.guesses ?? []).filter((r) => r.game_id === game.id && !r.correct).flatMap((r) => r.noise_picks ?? []))]
+      .filter((number) => real.has(number)).sort((a, b) => a - b);
+    if (notNoise.length) out.notNoise = notNoise;
   }
   if (isLead && !isRevealed) {
     const enabled = game.phase === "TURN" && !block?.paused_at && cards.length >= guessThreshold && !game.guess_locked && (!gm || !!game.gm_guess_open);

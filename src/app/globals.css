@@ -197,6 +197,8 @@ summary span { float: right; color: var(--accent); }
 .choice-button.ruled-out .ruled-name { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .ruled-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; background: var(--line-soft); color: var(--secondary); font-size: 10px; font-weight: 650; line-height: 1.4; white-space: nowrap; }
 .ruled-hint { margin: -10px 0 14px; }
+.noise-choice.not-noise { border-style: dashed; background: var(--surface-soft); }
+.noise-choice.not-noise .noise-choice-answer strong { text-decoration: line-through; }
 
 .ruled-out-notice strong { display: block; font-size: 15px; }
 .ruled-out-notice p { margin: 6px 0 0; }

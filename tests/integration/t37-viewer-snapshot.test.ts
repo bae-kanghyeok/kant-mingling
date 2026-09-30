@@ -173,6 +173,23 @@ it("T37 viewer-scoped snapshot yields the full snapshot's DTO for every viewer t
   game = await current("A");
   while (game.card_count < 5 && game.phase !== "ENSEMBLE_SHARE") game = await nextCard("A");
   await compareAll("A game 2 Noise + Ground Truth", viewers);
+  // A wrong Owner with a wrong Noise pick: A's members see who and which Data were ruled out.
+  game = await current("A");
+  while (game.phase === "ENSEMBLE_SHARE" || !game.noise_picks.length) {
+    if (game.phase === "ENSEMBLE_SHARE") await passEnsemble("A"); else await nextCard("A");
+    game = await current("A");
+  }
+  const aLead = sessions.get(game.turn_lead_participant_id)!;
+  success(await action(game, "intro-ack", { introKey: "noise" }, aLead));
+  if (game.gt_status === "announced") success(await action(game, "intro-ack", { introKey: "ground_truth" }, aLead));
+  success(await admin("open-guess", {}, "A", gm("A")));
+  game = await current("A");
+  const aVerified = (await getPool().query<{ card_no: number }>("SELECT c.card_no FROM ground_truths r JOIN data_cards c ON c.id=r.card_id WHERE r.game_id=$1", [game.id])).rows.map(row => row.card_no);
+  const aReal = Array.from({ length: game.card_count }, (_, index) => index + 1).find(number => !game.noise_picks.includes(number) && !aVerified.includes(number))!;
+  const aWrong = game.member_ids.find(id => id !== game.owner_participant_id)!;
+  expect(success(await action(game, "guess", { ownerPick: aWrong, noisePicks: [aReal, ...game.noise_picks].slice(0, game.noise_picks.length) }, aLead))).toEqual({ correct: false });
+  await compareAll("A wrong Owner and Noise", viewers);
+  await nextCard("A");
   await finish("A", 3); await finish("B", 1); await finish("C", 1);
   await compareAll("all revealed", viewers);
 

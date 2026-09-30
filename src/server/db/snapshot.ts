@@ -41,7 +41,7 @@ export interface EventSnapshot {
   members: { game_id: string; participant_id: string }[];
   deliveries: { card_id: string; participant_id: string }[];
   votes: { game_id: string; voter_id: string; pick_id: string; revision: number }[];
-  guesses?: { game_id: string; owner_pick: string; attempt_no: number; revealed_count: number; correct: boolean }[];
+  guesses?: { game_id: string; owner_pick: string; noise_picks: number[]; attempt_no: number; revealed_count: number; correct: boolean }[];
   groundTruths: { game_id: string; card_id: string }[];
   intros: { participant_id: string; intro_key: IntroKey }[];
   overlays: { game_id: string; participant_id: string; kind: string }[];
@@ -116,7 +116,7 @@ SELECT jsonb_build_object(
     FROM card_deliveries d JOIN data_cards c ON c.id=d.card_id WHERE c.game_id IN (SELECT id FROM child)),'[]'::jsonb),
   'votes',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',v.game_id,'voter_id',v.voter_id,'pick_id',v.pick_id,'revision',v.revision))
     FROM ensemble_votes v WHERE v.game_id IN (SELECT id FROM child)),'[]'::jsonb),
-  'guesses',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',a.game_id,'owner_pick',a.owner_pick,'attempt_no',a.attempt_no,
+  'guesses',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',a.game_id,'owner_pick',a.owner_pick,'noise_picks',a.noise_picks,'attempt_no',a.attempt_no,
     'revealed_count',a.revealed_count,'correct',a.correct) ORDER BY a.game_id,a.attempt_no)
     FROM guess_attempts a WHERE a.game_id IN (SELECT id FROM mine) AND NOT a.correct),'[]'::jsonb),
   'groundTruths',COALESCE((SELECT jsonb_agg(jsonb_build_object('game_id',r.game_id,'card_id',r.card_id))

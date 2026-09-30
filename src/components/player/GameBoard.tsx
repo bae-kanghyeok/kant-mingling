@@ -69,6 +69,7 @@ export function GameBoard({ state, game, send, busy, initialGuessOpen = false, i
   const ruledOut = gmMode ? game.ruledOut ?? [] : [];
   const lastRuledOut = ruledOut.at(-1);
   const justRuledOut = !!lastRuledOut && lastRuledOut.atCard === game.cards.length;
+  const notNoise = gmMode ? game.notNoise ?? [] : [];
   const latest = game.cards.at(-1);
   const ownCards = game.cards.filter((card) => card.text !== undefined);
   const more = () => void send("/api/game/more-data", { gameId: game.gameId, gameVersion: state.versions.game, expectedCardCount: game.cards.length }).catch(() => {});
@@ -77,9 +78,10 @@ export function GameBoard({ state, game, send, busy, initialGuessOpen = false, i
     <SectionTitle label={`Whose Data? · ${state.team?.key ?? ""}조`} title={`Game ${game.gameNo}${game.cards.length === 1 ? " 시작" : ""}`} description={gmMode ? "여러분은 어느 쪽인가요? 선택과 이유를 함께 나눠보세요." : "우리 조의 Data Owner를 찾아보세요."} />
     <div className="game-strip"><span>Data <strong>{number(game.cards.length)}</strong></span><span>{gmMode ? "이번 추리 담당" : "이번 Turn Lead"}: <strong>{game.turnLead?.displayName ?? "—"}</strong></span></div>
     {state.team?.paused && <div className="notice" role="status">운영진이 잠시 멈췄어요. 곧 이어서 진행합니다.</div>}
-    {ruledOut.length > 0 && <div className={`notice ruled-out-notice ${justRuledOut ? "error-tone" : ""}`} role="status">
+    {(ruledOut.length > 0 || notNoise.length > 0) && <div className={`notice ruled-out-notice ${justRuledOut ? "error-tone" : ""}`} role="status">
       {justRuledOut && lastRuledOut && <><strong>{lastRuledOut.displayName}님은 Data Owner가 아니에요!</strong><p>{game.exhausted ? "모든 Data를 보았어요. 이야기를 나눈 뒤 GM이 다시 추리를 열어줘요." : "GM이 다음 단서를 전하면 다시 이야기하고 추리해보세요."}</p></>}
-      {(!justRuledOut || ruledOut.length > 1) && <p className="small">{justRuledOut ? "지금까지" : "앞선 추리에서"} 아니었던 분: {ruledOut.map((person) => person.displayName).join(", ")}</p>}
+      {ruledOut.length > 0 && (!justRuledOut || ruledOut.length > 1) && <p className="small">{justRuledOut ? "지금까지" : "앞선 추리에서"} 아니었던 분: {ruledOut.map((person) => person.displayName).join(", ")}</p>}
+      {notNoise.length > 0 && <p className="small">Noise가 아니었던 Data: {notNoise.map((cardNo) => `Data ${number(cardNo)}`).join(" · ")}</p>}
     </div>}
     {latest && <article className={`data-card latest-card ${latest.text === undefined ? "sealed" : ""}`}>
       <div className="card-meta"><span>Data {number(latest.cardNo)}</span>{latest.verified && <span className="badge verified">Verified</span>}<span aria-hidden="true">✳</span></div>

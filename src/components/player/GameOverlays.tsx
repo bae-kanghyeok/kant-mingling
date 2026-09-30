@@ -40,6 +40,7 @@ export function GuessModal({ state, game, send, busy, onClose, onWrong }: {
   const [error, setError] = useState<string | null>(null);
   const k = game.guess?.noiseCount ?? 0;
   const ruledOutIds = new Set((game.ruledOut ?? []).map((person) => person.participantId));
+  const notNoise = new Set(game.notNoise ?? []);
   const reviewCards = new Map(game.guess?.cards?.map((card) => [card.cardNo, card]));
   const noiseChoices = game.cards.map((card) => ({ ...card, ...reviewCards.get(card.cardNo) }));
   const submit = async () => {
@@ -57,13 +58,13 @@ export function GuessModal({ state, game, send, busy, onClose, onWrong }: {
     {game.guess?.noiseCount !== undefined && <section className="noise-picker"><p className="pill">현재 Data {game.cards.length}개 / 이 중 Noise {k}개</p>{k > 0 && <>
       <h3>어떤 Data가 Noise라고 생각하나요?</h3>
       <p className="small muted">지금까지 우리 조에 전달된 질문과 답변을 다시 읽고, Noise로 의심되는 Data를 골라주세요.{game.gm && " Data Owner를 맞히면 Noise를 틀려도 정답이고, 정답 공개 때 Noise를 알려드려요."}</p>
-      <div className="noise-choice-list" role="group" aria-label="Noise로 의심되는 Data 선택">{noiseChoices.map((card) => <button key={card.cardNo} className={`choice-button noise-choice ${noisePicks.includes(card.cardNo) ? "selected" : ""}`} aria-pressed={noisePicks.includes(card.cardNo)} disabled={!!card.verified || (!noisePicks.includes(card.cardNo) && noisePicks.length >= k)} onClick={() => setNoisePicks((current) => current.includes(card.cardNo) ? current.filter((number) => number !== card.cardNo) : [...current, card.cardNo])}>
-        <span className="noise-choice-heading"><strong>Data {dataNumber(card.cardNo)}</strong>{card.verified ? <span className="badge verified">Verified · 선택 불가</span> : <span className="noise-choice-check" aria-hidden="true">{noisePicks.includes(card.cardNo) ? "✓" : "+"}</span>}</span>
+      <div className="noise-choice-list" role="group" aria-label="Noise로 의심되는 Data 선택">{noiseChoices.map((card) => <button key={card.cardNo} className={`choice-button noise-choice ${noisePicks.includes(card.cardNo) ? "selected" : ""} ${notNoise.has(card.cardNo) ? "not-noise" : ""}`} aria-pressed={noisePicks.includes(card.cardNo)} disabled={!!card.verified || notNoise.has(card.cardNo) || (!noisePicks.includes(card.cardNo) && noisePicks.length >= k)} onClick={() => setNoisePicks((current) => current.includes(card.cardNo) ? current.filter((number) => number !== card.cardNo) : [...current, card.cardNo])}>
+        <span className="noise-choice-heading"><strong>Data {dataNumber(card.cardNo)}</strong>{card.verified ? <span className="badge verified">Verified · 선택 불가</span> : notNoise.has(card.cardNo) ? <span className="ruled-badge">✕ Noise 아니었어요</span> : <span className="noise-choice-check" aria-hidden="true">{noisePicks.includes(card.cardNo) ? "✓" : "+"}</span>}</span>
         {card.text !== undefined ? <>
           {card.question && <span className="noise-choice-question">{card.question.category && <span className="noise-choice-category">{card.question.category}</span>}<span>{card.question.options.A} <span className="noise-choice-vs">vs</span> {card.question.options.B}</span></span>}
           <span className="noise-choice-answer"><span>선택한 답변</span><strong>{card.text}</strong></span>
         </> : <span className="noise-choice-unreceived"><strong>{card.recipients.map((recipient) => recipient.displayName).join(", ") || "다른 참가자"}님에게 전달된 Data</strong><span>받은 사람에게 내용을 확인한 뒤 선택해주세요.</span></span>}
-      </button>)}</div><p className="small muted">{noisePicks.length} / {k}개 선택</p></>}</section>}
+      </button>)}</div><p className="small muted">{noisePicks.length} / {k}개 선택</p>{notNoise.size > 0 && <p className="small muted">앞선 추리에서 Noise가 아니었던 Data는 고를 수 없어요.</p>}</>}</section>}
     {error && <p className="error-message" role="alert">{error}</p>}<button className="button primary full" disabled={busy || !ownerPick || noisePicks.length !== k} onClick={() => void submit()}>이대로 추리하기</button>
   </Modal>;
 }

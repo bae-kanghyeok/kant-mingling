@@ -130,6 +130,7 @@
   "game.guess.enabled",
   "game.guess.locked",
   "game.guess.noiseCount",
+  "game.notNoise",
   "game.pendingOverlay",
   "game.pendingOverlay.cardCount",
   "game.pendingOverlay.cardNo",

@@ -13,6 +13,8 @@ export interface PublicGame {
   exhausted: boolean;
   /** GM mode: people a wrong guess ruled out, latest last; atCard is the Data count at that guess. */
   ruledOut?: (Pick<Person,"participantId"|"displayName"> & { atCard: number })[];
+  /** GM mode: Data a wrong guess picked as Noise that are real, so they cannot be picked again. */
+  notNoise?: number[];
   guess?: { enabled: boolean; locked: boolean; noiseCount?: number;
     cards?: { cardNo: number; question: CardQuestion; text: string }[] };
   ensemble?: { stage: "SHARE"|"VOTE"|"DISCUSS"; triggerCardNo: number; sharer: Pick<Person,"participantId"|"displayName">;

@@ -175,10 +175,14 @@ it("T36 the Owner alone decides a GM guess, the team sees who a wrong guess rule
   await acknowledge(game);
   success(await admin("open-guess", {}, "A")); game = await current();
   const teammate = sessions.get(game.member_ids.find(id => id !== game.turn_lead_participant_id)!)!;
-  // The right Noise does not rescue a wrong Owner; everyone sees who was ruled out.
+  // A wrong Owner with a wrong Noise pick: everyone sees who was ruled out and which Data was not Noise.
   const wrong = game.member_ids.find(id => id !== game.owner_participant_id)!;
-  expect(success(await action(game, "guess", { ownerPick: wrong, noisePicks: game.noise_picks }))).toEqual({ correct: false });
-  expect((await getState(event.slug, teammate.tokenHash)).game?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count })]);
+  const firstReal = Array.from({ length: game.card_count }, (_, index) => index + 1).find(number => !game.noise_picks.includes(number))!;
+  const firstNoisePicks = [firstReal, ...game.noise_picks].slice(0, game.noise_picks.length);
+  expect(success(await action(game, "guess", { ownerPick: wrong, noisePicks: firstNoisePicks }))).toEqual({ correct: false });
+  const afterWrong = (await getState(event.slug, teammate.tokenHash)).game;
+  expect(afterWrong?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count })]);
+  expect(afterWrong?.notNoise).toEqual([firstReal]);
   game = await cardsTo("A", game.card_count + 1);
   await acknowledge(game);
   expect((await getState(event.slug, teammate.tokenHash)).game?.ruledOut).toEqual([expect.objectContaining({ participantId: wrong, atCard: game.card_count - 1 })]);

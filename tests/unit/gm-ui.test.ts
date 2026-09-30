@@ -45,6 +45,19 @@ describe("GM participant and facilitator surfaces", () => {
     expect(button).toMatch(/<button[^>]*disabled=""/);
     expect(html).toContain("고를 수 없어요");
   });
+  it("locks Data a wrong guess picked as Noise and lists them for the team", () => {
+    const state = createPreviewState("gm-guess");
+    const target = state.game!.cards[0].cardNo;
+    state.game!.notNoise = [target];
+    const html = renderToStaticMarkup(createElement(GuessModal, { state, game: state.game!, send: vi.fn(), busy: false, onClose: vi.fn(), onWrong: vi.fn() }));
+    const label = `Data ${String(target).padStart(2, "0")}`;
+    const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? []).find((item) => item.includes("noise-choice") && item.includes(label))!;
+    expect(button).toContain("✕ Noise 아니었어요");
+    expect(button).toMatch(/<button[^>]*disabled=""/);
+    expect(html).toContain("Noise가 아니었던 Data는 고를 수 없어요");
+    const board = renderToStaticMarkup(createElement(GameBoard, { state, game: state.game!, send: vi.fn(), busy: false }));
+    expect(board).toContain(`Noise가 아니었던 Data: ${label}`);
+  });
   it("names the Noise Data on a GM reveal", () => {
     const state = createPreviewState("gm-reveal");
     const game = state.game ?? state.lastReveal!;
