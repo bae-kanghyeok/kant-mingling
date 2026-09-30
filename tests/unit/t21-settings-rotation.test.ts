@@ -70,6 +70,20 @@ describe('T21 weighted rotation without fixed 18/3/3 assumptions', () => {
     expect(changed.assignments.filter((person) => person.role === 'student').map((person) => person.participantId)).toEqual(activeStudentIds);
     expect(changed.assignments.map((person) => person.seatNo)).toEqual([0, 1, 2, 3, 4, 5]);
   });
+  it.each([[18, 3, 3, 5], [17, 3, 3, 4], [4, 2, 1, 1], [4, 2, 2, 1]])('spreads ready students evenly: %i students/%i teams with %i not ready', (students, teams, notReady, minReady) => {
+    const config = parseGlobalConfig({ ...DEFAULT_GLOBAL_CONFIG, studentCount: students, teamCount: teams, moveCountPerTeam: 1, operatorTeamByName: {} });
+    const people = roster(students, teams).map((person, index) => ({ ...person, ready: !(person.role === 'student' && index < notReady) }));
+    const plain = createInitialAssignments({ config, roster: roster(students, teams), rng: makeRng('balance', `${students}`) });
+    for (let seed = 0; seed < 20; seed++) {
+      const assignments = createInitialAssignments({ config, roster: people, rng: makeRng('balance', `${students}:${seed}`) });
+      const readyCounts = getTeamKeys(teams).map((key) => assignments.filter((a) => a.teamKey === key && a.role === 'student' && people.find((p) => p.id === a.participantId)!.ready).length);
+      expect(Math.max(...readyCounts) - Math.min(...readyCounts)).toBeLessThanOrEqual(1);
+      expect(Math.min(...readyCounts)).toBeGreaterThanOrEqual(minReady);
+      expect(new Set(assignments.map((a) => a.participantId)).size).toBe(students + teams);
+    }
+    // Everyone ready (or no readiness given) keeps the previous seating exactly.
+    expect(createInitialAssignments({ config, roster: roster(students, teams).map((p) => ({ ...p, ready: true })), rng: makeRng('balance', `${students}`) })).toEqual(plain);
+  });
   it.each([[18, 3, 3], [11, 4, 2], [7, 2, 1], [12, 3, 0]])('keeps seats, operators and exact moves for %i students/%i teams/%i moves', (students, teams, moves) => {
     const config = parseGlobalConfig({ ...DEFAULT_GLOBAL_CONFIG, studentCount: students, teamCount: teams, moveCountPerTeam: moves, operatorTeamByName: {} });
     const assignments = createInitialAssignments({ config, roster: roster(students, teams), rng: makeRng('initial', `${students}`) });

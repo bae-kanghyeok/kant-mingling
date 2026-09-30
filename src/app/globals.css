@@ -198,6 +198,8 @@ summary span { float: right; color: var(--accent); }
 .ruled-out-notice strong { display: block; font-size: 15px; }
 .ruled-out-notice p { margin: 6px 0 0; }
 .reveal-noise strong { margin-right: 6px; }
+.lobby-summary p { margin: 6px 0 0; }
+.lobby-count { margin-top: 8px; }
 .noise-picker { border-top: 1px solid var(--line); margin-top: 26px; padding-top: 18px; }
 .noise-choice-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
 .noise-choice { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 16px; text-align: left; white-space: normal; overflow-wrap: anywhere; }

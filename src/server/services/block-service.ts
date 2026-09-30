@@ -26,7 +26,10 @@ export async function effectiveNextRoster(ctx: TxContext) {
   return (ctx.event.pending_roster_json as RosterEntry[]|null) ?? await readRoster(ctx);
 }
 export async function createSetupDraft(ctx: TxContext) {
-  const roster = await effectiveNextRoster(ctx);
+  // Seat ready students (finished profile, not absent) evenly; press 조 편성 again after late arrivals.
+  const ready = new Set((await ctx.client.query<{id:string}>(`SELECT id FROM participants
+    WHERE event_id=$1 AND attendance<>'absent' AND profile_completed_at IS NOT NULL`,[ctx.event.id])).rows.map(row=>row.id));
+  const roster = (await effectiveNextRoster(ctx)).map(member=>({...member,ready:ready.has(member.id)}));
   const config = validateRosterConfig(ctx.event.pending_config_json ?? ctx.event.config_json,roster,ctx.event.host_participant_id ?? undefined);
   const assignments = createInitialAssignments({config,roster,rng:rng("initial-teams")});
   await ctx.client.query("UPDATE events SET draft_assignments=$2,session_version=session_version+1 WHERE id=$1",[ctx.event.id,JSON.stringify(assignments)]);

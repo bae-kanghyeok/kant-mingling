@@ -27,10 +27,22 @@ export function createInitialAssignments({ config: input, roster, rng }: Initial
     }
   }
   const students = rng.shuffle(active.filter((member) => member.role === 'student'));
-  let offset = 0;
+  // Spread ready students as evenly as seats allow, so no-shows never pile into one team.
+  // Everyone else keeps a seat for a late arrival. With everyone ready this equals a plain fill.
+  const ready = students.filter((member) => member.ready !== false);
+  const waiting = students.filter((member) => member.ready === false);
+  const readyQuota = keys.map(() => 0);
+  for (let given = 0; given < ready.length; given++) {
+    let pick = -1;
+    readyQuota.forEach((count, index) => { if (count < capacities[index] && (pick < 0 || count < readyQuota[pick])) pick = index; });
+    if (pick < 0) throw new GameRuleError('STUDENT_COUNT_MISMATCH');
+    readyQuota[pick]++;
+  }
+  let readyOffset = 0, waitingOffset = 0;
   keys.forEach((key, index) => {
     for (let seat = 1; seat <= capacities[index]; seat++) {
-      assignments.push({ participantId: students[offset++].id, teamKey: key, role: 'student', seatNo: seat });
+      const student = seat <= readyQuota[index] ? ready[readyOffset++] : waiting[waitingOffset++];
+      assignments.push({ participantId: student.id, teamKey: key, role: 'student', seatNo: seat });
     }
   });
   return assignments;

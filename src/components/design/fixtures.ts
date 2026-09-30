@@ -6,7 +6,11 @@ export const previewScenarios = [
   { key: "gm-tutorial", label: "GM 방식 · 게임 방법", group: "GM 방식 · 최신", description: "진행자와 함께 선택·이유를 나누고 추리하는 방식을 안내합니다." },
   { key: "gm-talk", label: "참가자 · 대화 중", group: "GM 방식 · 최신", description: "참가자는 추가 단서를 직접 넘기지 않고, GM이 추리를 열 때까지 대화를 나눕니다." },
   { key: "gm-guess", label: "참가자 · 추리 열림", group: "GM 방식 · 최신", description: "GM이 추리를 열면 현재 추리 담당자에게 제출 버튼이 활성화됩니다." },
+  { key: "gm-wrong", label: "참가자 · 틀린 추리 공유", group: "GM 방식 · 최신", description: "추리 담당이 틀린 사람을 고르면 조원 모두에게 ‘○○님은 Data Owner가 아니에요!’가 뜨고, 다음 추리·투표 선택지에 표시가 붙어요." },
+  { key: "gm-vote", label: "참가자 · 앙상블 투표", group: "GM 방식 · 최신", description: "투표 선택지에도 앞선 추리에서 아니었던 사람이 표시돼요. 표시는 안내일 뿐 투표는 막지 않아요." },
   { key: "gm-remote", label: "GM 리모컨", group: "GM 방식 · 최신", description: "GM이 다음 단서를 전하거나 추리를 열고 닫습니다. 정답은 미리 보이지 않습니다." },
+  { key: "gm-team-remote", label: "조 GM 리모컨", group: "GM 방식 · 최신", description: "총괄이 아닌 조 GM에게는 자기 조만 보이고, 조 편성·조 이동·전체 종료 같은 총괄 기능은 없어요." },
+  { key: "gm-lobby", label: "총괄 · 대기실 인원", group: "GM 방식 · 최신", description: "행사 시작 전 입장·준비·접속 인원과 아직 들어오지 않은 사람을 보고 조 편성을 누릅니다." },
   { key: "gm-reveal", label: "GM · 다음 판 설정", group: "GM 방식 · 최신", description: "정답 공개 뒤 대화를 이어가고, 다음 판의 Noise 최대 개수와 확실한 단서를 설정합니다." },
   { key: "gm-rotation", label: "GM · 조 이동 준비", group: "GM 방식 · 최신", description: "현재 판과 대화를 마친 조부터 준비 완료를 누릅니다. 모두 준비되면 총괄 GM이 새 조를 공개합니다." },
   { key: "entry", label: "첫 입장", group: "등록 · 준비", description: "QR 링크로 처음 들어왔을 때의 환영 화면입니다." },
@@ -46,7 +50,7 @@ export const previewScenarios = [
 export type PreviewView = typeof previewScenarios[number]["key"];
 export const previewViews = previewScenarios.map(({ key, label }) => [key, label] as const);
 export const previewGroups = [...new Set(previewScenarios.map(({ group }) => group))];
-export const isAdminPreview = (view: PreviewView) => view === "admin" || view.startsWith("admin-") || ["gm-remote", "gm-reveal", "gm-rotation"].includes(view);
+export const isAdminPreview = (view: PreviewView) => view === "admin" || view.startsWith("admin-") || ["gm-remote", "gm-team-remote", "gm-lobby", "gm-reveal", "gm-rotation"].includes(view);
 
 const students: Person[] = Array.from({ length: 18 }, (_, index) => ({
   participantId: `design-student-${index + 1}`,
@@ -104,7 +108,7 @@ function createAdmin(): AdminView {
       settings: structuredClone(teamSettings), canControl: true, version: 1,
       gameVersion: 1, gameId: `design-game-${key}`,
     })),
-    registration: previewPeople.map((person) => ({ ...person, locked: true, profileComplete: true, attendance: "present", active: true })),
+    registration: previewPeople.map((person) => ({ ...person, locked: true, online: true, profileComplete: true, attendance: "present", active: true })),
     recentLogs: [
       { command: "resume", actorName: "운영진A", target: "A조", at: syntheticNow },
       { command: "pause", actorName: "운영진A", target: "A조", at: "2026-01-01T08:59:00.000Z" },
@@ -117,14 +121,14 @@ function createAdmin(): AdminView {
 /** Synthetic display fixtures only. No server state, credentials or hidden game fields. */
 export function createPreviewState(view: PreviewView): PublicState {
   if (view.startsWith("gm-")) {
-    const base = createPreviewState(view === "gm-tutorial" ? "tutorial" : view === "gm-reveal" || view === "gm-rotation" ? "reveal" : view === "gm-remote" ? "admin" : "turn-lead");
+    const base = createPreviewState(view === "gm-tutorial" ? "tutorial" : view === "gm-vote" ? "vote" : view === "gm-reveal" || view === "gm-rotation" ? "reveal" : ["gm-remote", "gm-team-remote", "gm-lobby"].includes(view) ? "admin" : "turn-lead");
     base.event = { ...base.event, gameplayMode: "gm", teamCount: 3, rotationRequested: view === "gm-rotation" };
     if (base.game) {
       base.game.gm = { guessOpen: view === "gm-guess" };
       if (base.game.guess) base.game.guess.enabled = view === "gm-guess";
       if (view !== "gm-guess") delete base.game.guess?.cards;
     }
-    base.allowedActions = view === "gm-guess" ? ["guess", "intro-ack"] : ["intro-ack"];
+    base.allowedActions = view === "gm-guess" ? ["guess", "intro-ack"] : view === "gm-vote" ? ["ensemble-vote", "intro-ack"] : ["intro-ack"];
     if (isAdminPreview(view)) {
       base.me = { ...operators[0], isHost: true, profileComplete: true, introsSeen: ["tutorial", "noise", "ensemble", "ground_truth"] };
       base.admin = createAdmin();
@@ -138,6 +142,25 @@ export function createPreviewState(view: PreviewView): PublicState {
       if (view === "gm-remote") base.allowedActions.push("next-card", "open-guess", "pause", "force-end-game", "request-rotation");
       else if (view === "gm-reveal") base.allowedActions.push("gm-next-game", "request-rotation");
       else base.allowedActions.push("rotation-ready", "cancel-rotation");
+    }
+    if ((view === "gm-wrong" || view === "gm-guess" || view === "gm-vote") && base.game) {
+      const other = base.game.candidates.find((person) => person.participantId !== base.me?.participantId) ?? base.game.candidates[0];
+      // gm-guess shows an earlier wrong guess as a reminder and a mark in the guess choices.
+      base.game.ruledOut = [{ ...other, atCard: view === "gm-wrong" ? base.game.cards.length : Math.max(1, base.game.cards.length - 1) }];
+      if (view === "gm-wrong" && base.game.guess) base.game.guess.locked = true;
+    }
+    if (view === "gm-team-remote" && base.admin) {
+      base.me = { ...base.me!, isHost: false }; base.admin.isHost = false;
+      base.allowedActions = ["update-team-settings", "unlock-participant", "mark-attendance", "next-card", "open-guess", "pause", "force-end-game"];
+    }
+    if (view === "gm-lobby" && base.admin) {
+      base.team = undefined; base.game = undefined; base.admin.teams = [];
+      const lobby = base.admin.registration!.map((person, index) => index < 2 ? { ...person, locked: false, online: false, profileComplete: false, attendance: "unknown" }
+        : index < 4 ? { ...person, profileComplete: false } : index === 4 ? { ...person, online: false, attendance: "absent" } : person);
+      base.admin.registration = lobby;
+      base.event = { ...base.event, phase: "SETUP", currentBlock: 0, presence: { total: lobby.length, entered: lobby.filter((person) => person.locked).length,
+        ready: lobby.filter((person) => person.profileComplete && person.attendance !== "absent").length, online: lobby.filter((person) => person.online).length } };
+      base.allowedActions = ["assign-teams", "end-session", "update-global-settings", "unlock-participant", "mark-attendance", "upsert-participant", "remove-participant"];
     }
     return base;
   }

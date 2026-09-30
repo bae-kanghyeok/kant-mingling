@@ -106,6 +106,7 @@ export function WaitingRoom({ state }: { state: PublicState }) {
   return <><SectionTitle label="Your team" title={state.nextBlock ? singleTeam ? "같은 조에서 다음 대화를 시작해요." : "새로운 사람들과 만나볼 시간입니다. 새 조를 확인해주세요." : "오늘의 Mingle 조"} description="함께 추리할 사람들을 확인해보세요." />
     <div className="team-ticket"><div className="team-letter">{state.nextBlock?.teamKey ?? state.team?.key ?? "?"}<span>Team</span></div><div><h2>{state.nextBlock ? `${state.nextBlock.seatNo}번 자리` : "함께할 사람들"}</h2><p>{state.nextBlock?.members.join(" · ") ?? state.team?.members.map((person) => person.displayName).join(" · ") ?? "조를 준비하고 있어요."}</p></div></div>
     <p className="notice">{state.team?.phase === "SEATING" ? singleTeam ? "자리 이동 없이 함께 준비해주세요. 호스트가 Game을 시작해요." : "새 자리에 앉으면 운영진이 Game을 시작해요." : "잠시 후 Game이 시작됩니다."}</p>
+    {state.event.presence && <p className="small muted center lobby-count">지금 {state.event.presence.entered}명 입장 · {state.event.presence.ready}명 준비 완료 · 전체 {state.event.presence.total}명</p>}
   </>;
 }
 

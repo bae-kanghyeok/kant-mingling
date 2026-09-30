@@ -32,7 +32,7 @@ export interface AdminView {
     members: (Person & { online: boolean; profileComplete: boolean; attendance: string })[];
     timers: { gameElapsedMs: number|null; blockElapsedMs: number|null; blockTargetMs: number };
     settings: TeamSettings; canControl: boolean; version: number; gameVersion?: number; gameId?: string }[];
-  registration?: (Person & { locked: boolean; profileComplete: boolean; attendance: string; active?: boolean; pending?: boolean })[];
+  registration?: (Person & { locked: boolean; online: boolean; profileComplete: boolean; attendance: string; active?: boolean; pending?: boolean })[];
   globalSettings?: GlobalConfig;
   nextBlockPlan?: { teamKey: string; members: string[] }[];
   recentLogs: { command: string; actorName: string; target: string|null; at: string }[];
@@ -41,7 +41,9 @@ export interface PublicState {
   serverNow: string; poll: { intervalMs: number; needsSync: boolean };
   versions: { session: number; team?: number; game?: number };
   event: { slug: string; title: string; phase: "SETUP"|"BLOCK"|"BREAK"|"ENDED"; currentBlock: number; teamCount?: number;
-    gameplayMode?: "classic"|"gm"; rotationRequested?: boolean };
+    gameplayMode?: "classic"|"gm"; rotationRequested?: boolean;
+    /** SETUP lobby counts: entered = name claimed, ready = profile done and not absent, online = seen in the presence window. */
+    presence?: { total: number; entered: number; ready: number; online: number } };
   me: (Person & { isHost: boolean; profileComplete: boolean; introsSeen: IntroKey[] })|null;
   roster?: (Person & { locked: boolean })[];
   profile?: { answers: Partial<Record<string,"A"|"B">>; revisions: Partial<Record<string,number>>; complete: boolean; editable: boolean };

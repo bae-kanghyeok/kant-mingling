@@ -194,6 +194,32 @@ it("T36 the Owner alone decides a GM guess, the team sees who a wrong guess rule
   expect(revealed.ruledOut).toBeUndefined();
 }, 240_000);
 
+it("T36 조 편성 seats ready students evenly and the lobby counts who has entered", async () => {
+  event = await createTestEvent({ studentCount: 18, teamCount: 3, moveCountPerTeam: 3 });
+  await getPool().query("UPDATE events SET config_json=config_json || '{\"gameplayMode\":\"gm\"}'::jsonb WHERE id=$1", [event.id]);
+  // Three students never arrive; everyone else enters and finishes the profile.
+  const noShows = event.students.slice(0, 3);
+  const arrived = [...event.students, ...event.operators].filter(id => !noShows.includes(id));
+  for (const id of arrived) sessions.set(id, await createTestSession(event, id));
+  await getPool().query(`INSERT INTO profile_answers(event_id,participant_id,question_id,option,revision)
+    SELECT p.event_id,p.id,'Q'||lpad(q::text,2,'0'),CASE WHEN (p.roster_order+q)%6<3 THEN 'A' ELSE 'B' END,1
+    FROM participants p CROSS JOIN generate_series(1,20) q WHERE p.event_id=$1 AND p.id=ANY($2::uuid[])`, [event.id, arrived]);
+  await getPool().query("UPDATE participants SET profile_completed_at=clock_timestamp() WHERE event_id=$1 AND id=ANY($2::uuid[])", [event.id, arrived]);
+  expect((await getState(event.slug, host().tokenHash)).event.presence).toMatchObject({ total: 21, entered: 18, ready: 18 });
+  const readyPerTeam = async (notReady: string[]) => {
+    const draft = (await getPool().query<{ draft_assignments: { participantId: string; teamKey: string; role: string }[] }>(
+      "SELECT draft_assignments FROM events WHERE id=$1", [event.id])).rows[0].draft_assignments;
+    return ["A", "B", "C"].map(key => draft.filter(a => a.teamKey === key && a.role === "student" && !notReady.includes(a.participantId)).length).sort();
+  };
+  success(await admin("assign-teams"));
+  expect(await readyPerTeam(noShows)).toEqual([5, 5, 5]);
+  // Someone who entered but left is marked absent; 조 편성 again rebalances.
+  success(await admin("mark-attendance", { participantId: event.students[3], attendance: "absent" }));
+  expect((await getState(event.slug, host().tokenHash)).event.presence).toMatchObject({ ready: 17 });
+  success(await admin("assign-teams"));
+  expect(await readyPerTeam([...noShows, event.students[3]])).toEqual([4, 5, 5]);
+}, 120_000);
+
 it("T36 per-game caps 0/1/2 and optional Ground Truth remain valid beyond GAME 9", async () => {
   await setup();
   for (let number = 1; number <= 10; number++) {

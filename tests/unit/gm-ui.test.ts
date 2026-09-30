@@ -77,6 +77,21 @@ describe("GM participant and facilitator surfaces", () => {
     expect(teamHtml.match(/class="admin-team-card/g)).toHaveLength(1);
     expect(teamHtml).toContain("정답 공개하고 이번 판 끝내기");
   });
+  it("previews the wrong-guess notice, the team GM remote and the host lobby", () => {
+    const wrong = createPreviewState("gm-wrong");
+    expect(renderToStaticMarkup(createElement(GameBoard, { state: wrong, game: wrong.game!, send: vi.fn(), busy: false }))).toContain("Data Owner가 아니에요!");
+    const vote = createPreviewState("gm-vote");
+    expect(renderToStaticMarkup(createElement(GameBoard, { state: vote, game: vote.game!, send: vi.fn(), busy: false }))).toContain("추리에서 아니었어요");
+    const team = createPreviewState("gm-team-remote");
+    const teamHtml = renderToStaticMarkup(createElement(AdminPanel, { state: team, send: vi.fn(), busy: false, onClose: vi.fn() }));
+    expect(teamHtml).not.toContain("전체 진행 · 총괄 GM");
+    const lobby = createPreviewState("gm-lobby");
+    const lobbyHtml = renderToStaticMarkup(createElement(AdminPanel, { state: lobby, send: vi.fn(), busy: false, onClose: vi.fn() }));
+    expect(lobbyHtml).toContain(`입장 ${lobby.event.presence!.entered} / ${lobby.event.presence!.total}명`);
+    expect(lobbyHtml).toContain("아직 입장 전:");
+    expect(lobbyHtml).toContain("20문항 작성 중:");
+    expect(lobbyHtml).toContain("결석 표시:");
+  });
   it("does not treat the third rotation as the event finale", () => {
     const state = createPreviewState("gm-rotation");
     state.event.currentBlock = 3;

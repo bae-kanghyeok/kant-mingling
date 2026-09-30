@@ -148,7 +148,7 @@ function adminDto(s: EventSnapshot, me: SnapshotPerson, isHost: boolean): AdminV
   admin.registration = s.people.map((p) => {
     const draft = s.event.pending_roster_json?.find((row) => row.id === p.id);
     return { participantId: p.id, displayName: draft?.displayName ?? p.display_name, role: draft?.role ?? p.role,
-      locked: locked(s, p.id), profileComplete: !!p.profile_completed_at, attendance: p.attendance,
+      locked: locked(s, p.id), online: online(s, p.id), profileComplete: !!p.profile_completed_at, attendance: p.attendance,
       active: draft ? draft.active !== false : p.active,
       ...(draft && (draft.active !== p.active || draft.displayName !== p.display_name || draft.role !== p.role) ? { pending: true } : {}) };
   });
@@ -184,10 +184,15 @@ export function buildPublicState(s: EventSnapshot): PublicState {
   const team = s.teams.find((t) => t.id === assignment?.team_id);
   const block = s.blocks.find((b) => b.team_id === team?.id && b.block_no === s.event.current_block);
   const game = s.games.find((g) => g.id === block?.current_game_id);
+  // Lobby counts before the event starts; counts only, never who is online.
+  const activePeople = s.people.filter((p) => p.active);
+  const presence = s.event.phase === "SETUP" ? { total: activePeople.length, entered: activePeople.filter((p) => locked(s, p.id)).length,
+    ready: activePeople.filter((p) => p.profile_completed_at && p.attendance !== "absent").length,
+    online: activePeople.filter((p) => online(s, p.id)).length } : null;
   const needsSync = s.games.some((g) => g.phase === "ENSEMBLE_VOTE" && g.vote_deadline && ms(g.vote_deadline)! <= ms(s.now)! && !s.blocks.find((b) => b.id === g.team_block_id)?.paused_at);
   const out: PublicState = { serverNow: s.now, poll: { intervalMs: block?.phase === "IN_GAME" ? s.event.config_json.pollInGameMs : s.event.config_json.pollIdleMs, needsSync },
     versions: { session: s.event.session_version, ...(block ? { team: block.team_version } : {}) },
-    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount, ...gmEvent },
+    event: { slug: s.event.slug, title: s.event.title, phase: s.event.phase, currentBlock: s.event.current_block, teamCount: s.event.config_json.teamCount, ...gmEvent, ...(presence ? { presence } : {}) },
     me: me ? { ...person(me), isHost, profileComplete: !!me.profile_completed_at, introsSeen: intros } : null, allowedActions: [] };
   if (!me) {
     out.roster = s.people.filter((p) => p.active).map((p) => ({ ...person(p), locked: locked(s, p.id) }));

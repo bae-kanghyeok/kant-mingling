@@ -55,6 +55,8 @@ export interface RosterEntry {
   role: ParticipantRole;
   active?: boolean;
   rosterOrder: number;
+  /** Initial seating only: entered with a finished profile and not marked absent. Missing means ready. */
+  ready?: boolean;
 }
 
 export type GamePhase = 'TURN' | 'ENSEMBLE_SHARE' | 'ENSEMBLE_VOTE' | 'ENSEMBLE_DISCUSS' | 'REVEALED';
