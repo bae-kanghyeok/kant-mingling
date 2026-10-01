@@ -14,7 +14,7 @@ const slides = [
 const gmSlides = [
   { title: "우리 조의 취향 주인공을 찾아봐요", body: "누군가 미리 고른 답이 단서로 하나씩 도착해요.", detail: "질문마다 여러분도 어느 쪽인지 골라보고 이유를 이야기해주세요. 내 Data 같아도 정체는 공개까지 잠깐 참아주세요.", symbol: "?" },
   { title: "단서를 읽고, 서로의 이야기를 들어요", body: "Data를 받은 사람이 질문과 답변을 팀에 읽어주세요.", detail: "같은 선택이어도 이유는 다를 수 있어요. 후보에서 제외됐다고 대화에서 빠질 필요는 없어요.", symbol: "↗" },
-  { title: "추리할까요, 단서를 더 볼까요?", body: "GM이 여러분의 의견을 듣고 다음 단서나 추리를 열어줘요.", detail: "마지막 단서를 받은 사람이 팀의 추리를 제출해요. GM도 정답은 몰라요. 뒤에는 실제 답이 바뀐 Noise가 섞일 수 있어요.", symbol: "↔" },
+  { title: "추리할까요, 단서를 더 볼까요?", body: "GM이 여러분의 의견을 듣고 다음 단서나 추리를 열어줘요.", detail: "마지막 단서를 받은 사람이 팀의 추리를 제출해요. GM도 정답은 몰라요.", symbol: "↔" },
 ];
 
 export function Tutorial({ onDone, doneLabel = "프로필 만들기", gmMode = false }: { onDone: () => void; doneLabel?: string; gmMode?: boolean }) {
